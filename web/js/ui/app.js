@@ -8,7 +8,7 @@ import { createEnergyVad } from '../audio/vad.js';
 import { TARGET_SAMPLE_RATE } from '../engine/types.js';
 import { toTxt, toSrt, toVtt, toJson } from '../export/formats.js';
 import { createWaveController } from './wave.js';
-import { cacheModelUrls } from '../pwa.js';
+import { cacheModelUrls, getShellVersion, setPWABusy } from '../pwa.js';
 
 registerEngine('whisper-cpp', createWhisperCppEngine);
 registerEngine('whisper-webgpu', createWhisperWebGPUEngine);
@@ -324,6 +324,7 @@ export async function bootApp() {
       }
       await ensureModel();
       recording = true;
+      syncPWAWork();
       setRecordingUI(true);
       setControls(true);
       els.btnMic.disabled = false;
@@ -362,6 +363,7 @@ export async function bootApp() {
       }, 40);
     } catch (err) {
       recording = false;
+      syncPWAWork();
       setRecordingUI(false);
       setControls(false);
       wave.setRecording(false);
@@ -379,6 +381,7 @@ export async function bootApp() {
       return;
     }
     busy = true;
+    syncPWAWork();
     els.btnMic.disabled = true;
     try {
       setStatus('Wrapping up...');
@@ -388,6 +391,7 @@ export async function bootApp() {
       const pcm = await mic.stop();
       cleanupMic();
       recording = false;
+      syncPWAWork();
       setRecordingUI(false);
       wave.setRecording(false);
       wave.setMode('transcribing');
@@ -412,6 +416,7 @@ export async function bootApp() {
       setLoading(false);
       setLive(false);
       busy = false;
+      syncPWAWork();
       syncTranslateToggle();
     }
   }
@@ -525,6 +530,7 @@ export async function bootApp() {
       return;
     }
     busy = true;
+    syncPWAWork();
     clearError();
     els.status.classList.remove('is-ok');
     setControls(true);
@@ -546,6 +552,7 @@ export async function bootApp() {
       setLoading(false);
       setLive(false);
       busy = false;
+      syncPWAWork();
       syncTranslateToggle();
     }
   }
@@ -730,6 +737,10 @@ export async function bootApp() {
    * @param {boolean} on
    * @param {string} [msg]
    */
+  function syncPWAWork() {
+    setPWABusy(busy || recording);
+  }
+
   function setBusy(on, msg) {
     busy = on;
     setControls(on);
@@ -737,6 +748,7 @@ export async function bootApp() {
     if (msg) {
       setStatus(msg);
     }
+    syncPWAWork();
   }
 
   /**
@@ -1151,13 +1163,23 @@ async function loadAppVersion() {
   try {
     const data = await fetchJSON('/api/version');
     const ver = data && typeof data.version === 'string' ? data.version.trim() : '';
-    if (!ver) {
+    if (ver) {
+      el.textContent = `v${ver}`;
+      el.hidden = false;
       return;
     }
-    el.textContent = `v${ver}`;
+  } catch {
+    /* try shell version below */
+  }
+  try {
+    const shell = await getShellVersion();
+    if (!shell || shell === 'dev') {
+      return;
+    }
+    el.textContent = `v${shell}`;
     el.hidden = false;
   } catch {
-    // Static hosts without the API omit the label.
+    /* Static hosts without a SW version omit the label. */
   }
 }
 
