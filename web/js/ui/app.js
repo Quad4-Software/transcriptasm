@@ -2,8 +2,11 @@ import { createEngine, registerEngine } from '../engine/registry.js';
 import { createWhisperCppEngine } from '../engine/whisper-cpp.js';
 import { decodeToWhisperPCM } from '../audio/decode.js';
 import { MicRecorder } from '../audio/mic.js';
+import { createEnergyVad } from '../audio/vad.js';
 import { TARGET_SAMPLE_RATE } from '../engine/types.js';
+import { toTxt, toSrt, toVtt, toJson } from '../export/formats.js';
 import { createWaveController } from './wave.js';
+import { cacheModelUrls, setupInstallAffordance } from '../pwa.js';
 
 registerEngine('whisper-cpp', createWhisperCppEngine);
 
@@ -14,10 +17,16 @@ export async function bootApp() {
   const els = {
     model: /** @type {HTMLSelectElement} */ (document.getElementById('model')),
     timestamps: /** @type {HTMLInputElement} */ (document.getElementById('timestamps')),
+    translate: /** @type {HTMLInputElement} */ (document.getElementById('translate')),
     btnMic: /** @type {HTMLButtonElement} */ (document.getElementById('btn-mic')),
     btnCopy: /** @type {HTMLButtonElement} */ (document.getElementById('btn-copy')),
-    btnDownload: /** @type {HTMLButtonElement} */ (document.getElementById('btn-download')),
+    btnExport: /** @type {HTMLButtonElement} */ (document.getElementById('btn-export')),
+    exportMenu: /** @type {HTMLElement} */ (document.getElementById('export-menu')),
     btnClear: /** @type {HTMLButtonElement} */ (document.getElementById('btn-clear')),
+    btnOffline: /** @type {HTMLButtonElement} */ (document.getElementById('btn-offline')),
+    btnInstall: /** @type {HTMLButtonElement} */ (document.getElementById('btn-install')),
+    btnIosTip: /** @type {HTMLButtonElement} */ (document.getElementById('btn-ios-tip')),
+    iosTipPanel: /** @type {HTMLElement} */ (document.getElementById('ios-tip-panel')),
     file: /** @type {HTMLInputElement} */ (document.getElementById('file')),
     status: /** @type {HTMLElement} */ (document.getElementById('status')),
     spinner: /** @type {HTMLElement} */ (document.getElementById('spinner')),
@@ -30,10 +39,17 @@ export async function bootApp() {
     wave: /** @type {HTMLCanvasElement} */ (document.getElementById('wave')),
     recLabel: /** @type {HTMLElement} */ (document.querySelector('.rec-label')),
     recTimer: /** @type {HTMLElement} */ (document.getElementById('rec-timer')),
+    dropOverlay: /** @type {HTMLElement} */ (document.getElementById('drop-overlay')),
+    stage: /** @type {HTMLElement} */ (document.querySelector('.stage')),
   };
 
   const wave = createWaveController(els.wave);
   wave.start();
+  setupInstallAffordance({
+    installBtn: els.btnInstall,
+    iosTipBtn: els.btnIosTip,
+    iosTipPanel: els.iosTipPanel,
+  });
 
   /** @type {import('../engine/types.js').ModelInfo[]} */
   let models = [];
@@ -62,8 +78,18 @@ export async function bootApp() {
   let playWatch = 0;
   /** @type {HTMLElement | null} */
   let activeSeg = null;
-  /** How many timestamp rows are already painted during live streaming. */
   let paintedSegs = 0;
+  let dragDepth = 0;
+
+  /** @type {ReturnType<typeof createEnergyVad> | null} */
+  let liveVad = null;
+  /** @type {Array<{ pcm: Float32Array, t0: number }>} */
+  let liveQueue = [];
+  let livePumpRunning = false;
+  /** @type {Array<{ text: string, timestamp?: [number|null, number|null] }>} */
+  let liveChunks = [];
+  let liveHadPartials = false;
+  let liveSessionStart = 0;
 
   els.transcript.addEventListener('click', (ev) => {
     const target = /** @type {HTMLElement} */ (ev.target);
@@ -88,6 +114,7 @@ export async function bootApp() {
   try {
     models = await loadModels();
     fillModels(els.model, models);
+    syncTranslateToggle();
     clearError();
     setStatus('Warming up...');
     warmup = ensureModel()
@@ -113,12 +140,35 @@ export async function bootApp() {
   });
   els.file.addEventListener('change', () => void onFile());
   els.btnCopy.addEventListener('click', () => void copyTranscript());
-  els.btnDownload.addEventListener('click', () => downloadTranscript());
+  els.btnExport.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    toggleExportMenu();
+  });
+  els.exportMenu.addEventListener('click', (ev) => {
+    const btn = /** @type {HTMLElement} */ (ev.target).closest('[data-format]');
+    if (!btn) {
+      return;
+    }
+    const format = btn.getAttribute('data-format') || 'txt';
+    closeExportMenu();
+    exportTranscript(format);
+  });
+  document.addEventListener('click', () => closeExportMenu());
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') {
+      closeExportMenu();
+      els.iosTipPanel.hidden = true;
+    }
+  });
   els.btnClear.addEventListener('click', () => clearTranscript());
+  els.btnOffline.addEventListener('click', () => void saveOffline());
   els.model.addEventListener('change', () => {
     loadedModelId = '';
+    syncTranslateToggle();
     clearError();
-    setBusy(true, 'Switching voice style...');
+    const model = selectedModel();
+    const sizeNote = model && model.optional ? ` (~${model.size_hint_mb} MB)` : '';
+    setBusy(true, `Switching voice style${sizeNote}...`);
     warmup = ensureModel()
       .then(() => {
         setBusy(false, 'Ready when you are.');
@@ -152,11 +202,32 @@ export async function bootApp() {
     }
   });
 
+  wireDragAndDrop();
+  window.addEventListener('paste', (ev) => void onPaste(ev));
+
   /**
    * @returns {import('../engine/types.js').ModelInfo | null}
    */
   function selectedModel() {
     return models.find((m) => m.id === els.model.value) || null;
+  }
+
+  function syncTranslateToggle() {
+    const model = selectedModel();
+    const multi = !!(model && model.multilingual);
+    els.translate.disabled = !multi || busy || recording;
+    if (!multi) {
+      els.translate.checked = false;
+    }
+    els.translate.parentElement?.setAttribute(
+      'title',
+      multi ? 'Translate speech to English' : 'Needs an any-language voice style.',
+    );
+  }
+
+  function wantTranslate() {
+    const model = selectedModel();
+    return !!(model && model.multilingual && els.translate.checked);
   }
 
   async function ensureModel() {
@@ -201,13 +272,35 @@ export async function bootApp() {
       if (warmup) {
         await warmup;
       }
+      await ensureModel();
       recording = true;
       setRecordingUI(true);
-      els.file.disabled = true;
-      els.model.disabled = true;
+      setControls(true);
+      els.btnMic.disabled = false;
+      liveQueue = [];
+      liveChunks = [];
+      liveHadPartials = false;
+      livePumpRunning = false;
+      lastResult = { text: '', chunks: [] };
+      paintedSegs = 0;
+      els.transcript.replaceChildren();
+      updateActions(false);
+      liveSessionStart = performance.now();
+      liveVad = createEnergyVad({
+        onSpeechEnd: (pcm, t0) => {
+          liveQueue.push({ pcm, t0 });
+          setStatus(liveQueue.length > 1 ? 'Catching up...' : 'Listening...');
+          void pumpLiveQueue();
+        },
+      });
       mic = new MicRecorder();
-      await mic.start();
+      await mic.start({
+        onFrame: (frame) => {
+          liveVad?.push(frame);
+        },
+      });
       setStatus('Listening... press Space or Stop when done');
+      setLive(true);
       wave.setMode('recording');
       wave.setRecording(true);
       recordStartedAt = Date.now();
@@ -223,9 +316,11 @@ export async function bootApp() {
       setControls(false);
       wave.setRecording(false);
       wave.setMode('idle');
+      setLive(false);
       setStatus('Could not reach the mic.');
       showError(friendlyError(err));
       cleanupMic();
+      liveVad = null;
     }
   }
 
@@ -238,18 +333,27 @@ export async function bootApp() {
     try {
       setStatus('Wrapping up...');
       setLoading(true);
+      liveVad?.flush();
+      liveVad = null;
       const pcm = await mic.stop();
       cleanupMic();
       recording = false;
       setRecordingUI(false);
       wave.setRecording(false);
       wave.setMode('transcribing');
-      await runTranscription(pcm);
+      await drainLiveQueue();
+      lastPCM = pcm;
+      if (!liveHadPartials) {
+        await runTranscription(pcm, { resetTranscript: true });
+      } else {
+        finalizeLiveSession(pcm);
+      }
     } catch (err) {
       setStatus('That recording did not work.');
       showError(friendlyError(err));
     } finally {
       cleanupMic();
+      liveVad = null;
       recording = false;
       setRecordingUI(false);
       wave.setRecording(false);
@@ -258,12 +362,99 @@ export async function bootApp() {
       setLoading(false);
       setLive(false);
       busy = false;
+      syncTranslateToggle();
     }
+  }
+
+  async function pumpLiveQueue() {
+    if (livePumpRunning) {
+      return;
+    }
+    livePumpRunning = true;
+    try {
+      while (liveQueue.length > 0) {
+        if (liveQueue.length > 1) {
+          setStatus('Catching up...');
+        }
+        const job = liveQueue.shift();
+        if (!job) {
+          break;
+        }
+        await ensureModel();
+        if (!engine) {
+          throw new Error('Voice engine is not ready.');
+        }
+        const model = selectedModel();
+        const result = await engine.transcribe(job.pcm, {
+          language: model?.language === 'auto' ? 'auto' : (model?.language || 'en'),
+          returnTimestamps: true,
+          translate: wantTranslate(),
+        });
+        const shifted = shiftChunks(result.chunks || [], job.t0);
+        liveChunks = liveChunks.concat(shifted);
+        liveHadPartials = liveChunks.length > 0;
+        lastResult = {
+          text: liveChunks.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim(),
+          chunks: liveChunks,
+        };
+        renderTranscript(lastResult, els.timestamps.checked, true);
+        updateActions(true);
+        if (recording && liveQueue.length === 0) {
+          setStatus('Listening...');
+        }
+      }
+    } catch (err) {
+      showError(friendlyError(err));
+    } finally {
+      livePumpRunning = false;
+      if (liveQueue.length > 0) {
+        void pumpLiveQueue();
+      }
+    }
+  }
+
+  async function drainLiveQueue() {
+    while (livePumpRunning || liveQueue.length > 0) {
+      await pumpLiveQueue();
+      if (liveQueue.length === 0 && !livePumpRunning) {
+        break;
+      }
+      await sleep(24);
+    }
+  }
+
+  /**
+   * @param {Float32Array} pcm
+   */
+  function finalizeLiveSession(pcm) {
+    const model = selectedModel();
+    const seconds = pcm.length / TARGET_SAMPLE_RATE;
+    const ms = Math.round(performance.now() - liveSessionStart);
+    const rtf = seconds > 0 ? (ms / 1000 / seconds) : 0;
+    paintedSegs = 0;
+    renderTranscript(lastResult || { text: '', chunks: [] }, els.timestamps.checked, false);
+    els.transcript.classList.remove('is-live');
+    hideProgress();
+    els.meta.hidden = false;
+    els.meta.textContent = `${seconds.toFixed(1)}s audio in ${(ms / 1000).toFixed(1)}s (${rtf.toFixed(2)}x) using ${model?.label || 'model'}`;
+    setStatus('Done. Still just on this device.');
+    els.status.classList.add('is-ok');
+    updateActions(!!(lastResult && (lastResult.text || (lastResult.chunks && lastResult.chunks.length))));
   }
 
   async function onFile() {
     const file = els.file.files && els.file.files[0];
     els.file.value = '';
+    if (!file) {
+      return;
+    }
+    await ingestFile(file);
+  }
+
+  /**
+   * @param {File} file
+   */
+  async function ingestFile(file) {
     if (!file || busy || recording) {
       return;
     }
@@ -284,7 +475,7 @@ export async function bootApp() {
       setStatus(`Opening ${file.name}...`);
       const pcm = await decodeToWhisperPCM(file);
       wave.setMode('transcribing');
-      await runTranscription(pcm);
+      await runTranscription(pcm, { resetTranscript: true });
     } catch (err) {
       setStatus('Could not read that file.');
       showError(friendlyError(err));
@@ -294,13 +485,15 @@ export async function bootApp() {
       setLoading(false);
       setLive(false);
       busy = false;
+      syncTranslateToggle();
     }
   }
 
   /**
    * @param {Float32Array} pcm
+   * @param {{ resetTranscript?: boolean }} [opts]
    */
-  async function runTranscription(pcm) {
+  async function runTranscription(pcm, opts = {}) {
     if (!pcm || pcm.length === 0) {
       setStatus('No sound found.');
       showError('Try again with a clearer recording or another file.');
@@ -321,12 +514,15 @@ export async function bootApp() {
     setLive(true);
     showProgress(8);
     els.transcript.classList.add('is-live');
-    paintedSegs = 0;
-    els.transcript.replaceChildren();
+    if (opts.resetTranscript !== false) {
+      paintedSegs = 0;
+      els.transcript.replaceChildren();
+    }
 
     const result = await engine.transcribe(pcm, {
-      language: model.language,
+      language: model.language === 'auto' ? 'auto' : model.language,
       returnTimestamps: true,
+      translate: wantTranslate(),
       onProgress: (p) => {
         if (typeof p.progress === 'number') {
           showProgress(Math.max(8, Math.round(p.progress * 100)));
@@ -353,6 +549,80 @@ export async function bootApp() {
     setStatus('Done. Still just on this device.');
     els.status.classList.add('is-ok');
     updateActions(!!(result.text || (result.chunks && result.chunks.length)));
+  }
+
+  function wireDragAndDrop() {
+    const onDragEnter = (ev) => {
+      if (!hasFiles(ev)) {
+        return;
+      }
+      ev.preventDefault();
+      dragDepth += 1;
+      els.dropOverlay.hidden = false;
+      els.dropOverlay.classList.add('is-on');
+    };
+    const onDragLeave = (ev) => {
+      if (!hasFiles(ev)) {
+        return;
+      }
+      ev.preventDefault();
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) {
+        els.dropOverlay.hidden = true;
+        els.dropOverlay.classList.remove('is-on');
+      }
+    };
+    const onDragOver = (ev) => {
+      if (!hasFiles(ev)) {
+        return;
+      }
+      ev.preventDefault();
+      if (ev.dataTransfer) {
+        ev.dataTransfer.dropEffect = 'copy';
+      }
+    };
+    const onDrop = (ev) => {
+      if (!hasFiles(ev)) {
+        return;
+      }
+      ev.preventDefault();
+      dragDepth = 0;
+      els.dropOverlay.hidden = true;
+      els.dropOverlay.classList.remove('is-on');
+      if (busy || recording) {
+        showError('Finish the current job before dropping another file.');
+        return;
+      }
+      const file = pickMediaFile(ev.dataTransfer?.files);
+      if (!file) {
+        showError('Drop an audio or video file.');
+        return;
+      }
+      void ingestFile(file);
+    };
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+  }
+
+  /**
+   * @param {ClipboardEvent} ev
+   */
+  async function onPaste(ev) {
+    if (busy || recording) {
+      return;
+    }
+    const tag = (ev.target && /** @type {HTMLElement} */ (ev.target).tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+      return;
+    }
+    const file = fileFromClipboard(ev.clipboardData);
+    if (!file) {
+      return;
+    }
+    ev.preventDefault();
+    await ingestFile(file);
   }
 
   function cleanupMic() {
@@ -392,6 +662,8 @@ export async function bootApp() {
     els.file.disabled = locked;
     els.model.disabled = locked;
     els.timestamps.disabled = locked;
+    els.translate.disabled = locked || !selectedModel()?.multilingual;
+    els.btnOffline.disabled = locked;
   }
 
   /**
@@ -459,8 +731,22 @@ export async function bootApp() {
    */
   function updateActions(hasText) {
     els.btnCopy.disabled = !hasText;
-    els.btnDownload.disabled = !hasText;
+    els.btnExport.disabled = !hasText;
     els.btnClear.disabled = !hasText;
+  }
+
+  function toggleExportMenu() {
+    if (els.btnExport.disabled) {
+      return;
+    }
+    const open = els.exportMenu.hidden;
+    els.exportMenu.hidden = !open;
+    els.btnExport.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function closeExportMenu() {
+    els.exportMenu.hidden = true;
+    els.btnExport.setAttribute('aria-expanded', 'false');
   }
 
   /**
@@ -602,7 +888,7 @@ export async function bootApp() {
   }
 
   function transcriptPlain() {
-    return (els.transcript.innerText || els.transcript.textContent || '').trim();
+    return toTxt(lastResult, els.timestamps.checked) || (els.transcript.innerText || '').trim();
   }
 
   async function copyTranscript() {
@@ -619,19 +905,45 @@ export async function bootApp() {
     }
   }
 
-  function downloadTranscript() {
-    const text = transcriptPlain();
-    if (!text) {
+  /**
+   * @param {string} format
+   */
+  function exportTranscript(format) {
+    if (!lastResult) {
       return;
     }
-    const blob = new Blob([text + '\n'], { type: 'text/plain;charset=utf-8' });
+    let body = '';
+    let mime = 'text/plain;charset=utf-8';
+    let ext = 'txt';
+    if (format === 'srt') {
+      body = toSrt(lastResult);
+      mime = 'application/x-subrip;charset=utf-8';
+      ext = 'srt';
+    } else if (format === 'vtt') {
+      body = toVtt(lastResult);
+      mime = 'text/vtt;charset=utf-8';
+      ext = 'vtt';
+    } else if (format === 'json') {
+      body = toJson(lastResult);
+      mime = 'application/json;charset=utf-8';
+      ext = 'json';
+    } else {
+      body = toTxt(lastResult, els.timestamps.checked);
+      if (body && !body.endsWith('\n')) {
+        body += '\n';
+      }
+    }
+    if (!body) {
+      return;
+    }
+    const blob = new Blob([body], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transcriptasm-${Date.now()}.txt`;
+    a.download = `transcriptasm-${Date.now()}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatus('Downloaded.');
+    setStatus(`Exported ${ext.toUpperCase()}.`);
     els.status.classList.add('is-ok');
   }
 
@@ -640,6 +952,7 @@ export async function bootApp() {
     lastResult = null;
     lastPCM = null;
     paintedSegs = 0;
+    liveChunks = [];
     els.transcript.replaceChildren();
     els.meta.hidden = true;
     els.meta.textContent = '';
@@ -647,6 +960,129 @@ export async function bootApp() {
     setStatus('Cleared. Ready when you are.');
     els.status.classList.add('is-ok');
   }
+
+  async function saveOffline() {
+    if (busy || recording) {
+      return;
+    }
+    const required = models.filter((m) => !m.optional);
+    const selected = selectedModel();
+    /** @type {import('../engine/types.js').ModelInfo[]} */
+    const want = [];
+    const seen = new Set();
+    for (const m of required) {
+      if (!seen.has(m.path)) {
+        seen.add(m.path);
+        want.push(m);
+      }
+    }
+    if (selected && selected.optional && !seen.has(selected.path)) {
+      want.push(selected);
+    }
+    if (want.length === 0) {
+      return;
+    }
+    busy = true;
+    setControls(true);
+    setLoading(true);
+    clearError();
+    try {
+      await cacheModelUrls(
+        want.map((m) => m.path),
+        (i, total) => {
+          setStatus(`Saving ${i}/${total}...`);
+          showProgress(Math.round((i / total) * 100));
+        },
+      );
+      hideProgress();
+      setStatus('Ready offline.');
+      els.status.classList.add('is-ok');
+    } catch (err) {
+      hideProgress();
+      setStatus('Could not save models offline.');
+      showError(friendlyError(err));
+    } finally {
+      busy = false;
+      setControls(false);
+      setLoading(false);
+      syncTranslateToggle();
+    }
+  }
+}
+
+/**
+ * @param {Array<{ text: string, timestamp?: [number|null, number|null] }> | undefined} chunks
+ * @param {number} offsetSec
+ */
+function shiftChunks(chunks, offsetSec) {
+  if (!chunks || chunks.length === 0) {
+    return [];
+  }
+  return chunks.map((c) => {
+    const t0 = c.timestamp && c.timestamp[0] != null ? Number(c.timestamp[0]) + offsetSec : offsetSec;
+    const t1 = c.timestamp && c.timestamp[1] != null ? Number(c.timestamp[1]) + offsetSec : t0;
+    return { text: c.text, timestamp: /** @type {[number, number]} */ ([t0, t1]) };
+  });
+}
+
+/**
+ * @param {number} ms
+ */
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * @param {DragEvent} ev
+ */
+function hasFiles(ev) {
+  const types = ev.dataTransfer && ev.dataTransfer.types;
+  if (!types) {
+    return false;
+  }
+  return Array.from(types).includes('Files');
+}
+
+/**
+ * @param {FileList | null | undefined} files
+ * @returns {File | null}
+ */
+function pickMediaFile(files) {
+  if (!files || files.length === 0) {
+    return null;
+  }
+  for (let i = 0; i < files.length; i++) {
+    if (isAllowedMediaFile(files[i])) {
+      return files[i];
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {DataTransfer | null} data
+ * @returns {File | null}
+ */
+function fileFromClipboard(data) {
+  if (!data) {
+    return null;
+  }
+  const fromFiles = pickMediaFile(data.files);
+  if (fromFiles) {
+    return fromFiles;
+  }
+  for (const item of Array.from(data.items || [])) {
+    if (item.kind !== 'file') {
+      continue;
+    }
+    const file = item.getAsFile();
+    if (file && isAllowedMediaFile(file)) {
+      return file;
+    }
+  }
+  return null;
 }
 
 /**
@@ -655,19 +1091,35 @@ export async function bootApp() {
  */
 function fillModels(select, models) {
   select.innerHTML = '';
-  for (const m of models) {
-    const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = m.label;
-    if (m.default) {
-      opt.selected = true;
-    }
-    select.appendChild(opt);
+  const core = models.filter((m) => !m.optional);
+  const optional = models.filter((m) => m.optional);
+  appendModelOptions(select, core);
+  if (optional.length) {
+    const group = document.createElement('optgroup');
+    group.label = 'More styles';
+    appendModelOptions(group, optional);
+    select.appendChild(group);
   }
 }
 
 /**
- * Prefer the Go API, fall back to static catalog for GitHub Pages.
+ * @param {HTMLSelectElement | HTMLOptGroupElement} parent
+ * @param {import('../engine/types.js').ModelInfo[]} models
+ */
+function appendModelOptions(parent, models) {
+  for (const m of models) {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.optional ? `${m.label} (~${m.size_hint_mb} MB)` : m.label;
+    if (m.default) {
+      opt.selected = true;
+    }
+    parent.appendChild(opt);
+  }
+}
+
+/**
+ * Prefer static catalog for Pages, then Go API.
  * @returns {Promise<import('../engine/types.js').ModelInfo[]>}
  */
 async function loadModels() {
@@ -700,7 +1152,6 @@ function isAllowedMediaFile(file) {
   if (mime.startsWith('audio/') || mime.startsWith('video/')) {
     return true;
   }
-  // Some OSes report WAV/MP4 as octet-stream or empty MIME.
   if (
     mime === '' ||
     mime === 'application/octet-stream' ||

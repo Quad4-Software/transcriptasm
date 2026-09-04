@@ -1,5 +1,5 @@
 /* transcriptasm service worker: offline shell, COOP/COEP isolation, auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.1.12';
+const CACHE_VERSION = 'transcriptasm-v0.2.0';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -18,6 +18,8 @@ const PRECACHE = [
   '/js/audio/mic.js',
   '/js/audio/resample.js',
   '/js/audio/pcm-buffer.js',
+  '/js/audio/vad.js',
+  '/js/export/formats.js',
   '/js/engine/registry.js',
   '/js/engine/types.js',
   '/js/engine/whisper-cpp.js',
@@ -61,13 +63,46 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  const data = event.data || {};
+  if (data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
   }
-  if (event.data && event.data.type === 'GET_VERSION') {
+  if (data.type === 'GET_VERSION') {
     event.source && event.source.postMessage({ type: 'SW_VERSION', version: CACHE_VERSION });
+    return;
+  }
+  if (data.type === 'CACHE_URLS') {
+    const port = event.ports && event.ports[0];
+    event.waitUntil(cacheUrls(data.urls || [], port));
   }
 });
+
+/**
+ * @param {string[]} urls
+ * @param {MessagePort | undefined} port
+ */
+async function cacheUrls(urls, port) {
+  try {
+    const cache = await caches.open(ASSET_CACHE);
+    const list = urls.filter((u) => typeof u === 'string' && u.startsWith('/'));
+    for (let i = 0; i < list.length; i++) {
+      const url = list[i];
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) {
+        throw new Error(`Could not fetch ${url}`);
+      }
+      await cache.put(url, res.clone());
+      port && port.postMessage({ type: 'CACHE_PROGRESS', done: i + 1, total: list.length });
+    }
+    port && port.postMessage({ type: 'CACHE_DONE' });
+  } catch (err) {
+    const msg = err && typeof err === 'object' && 'message' in err
+      ? String(/** @type {{ message: string }} */ (err).message)
+      : 'Could not cache models.';
+    port && port.postMessage({ type: 'CACHE_ERROR', error: msg });
+  }
+}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;

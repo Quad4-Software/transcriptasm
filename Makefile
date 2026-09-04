@@ -60,7 +60,7 @@ test-go:
 	$(GO) test $(GOFLAGS) ./...
 
 test-js:
-	$(NODE) --test web/js/audio/audio.test.mjs web/js/engine/parse.test.mjs
+	$(NODE) --test web/js/audio/audio.test.mjs web/js/audio/vad.test.mjs web/js/engine/parse.test.mjs web/js/export/formats.test.mjs
 
 test: test-go test-js
 

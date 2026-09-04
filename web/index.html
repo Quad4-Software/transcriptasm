@@ -68,13 +68,23 @@
   </script>
 </head>
 <body>
-  <a class="source-link" href="https://github.com/Quad4-Software/transcriptasm" rel="noopener noreferrer" target="_blank">Source</a>
+  <div class="chrome-top">
+    <button type="button" id="btn-install" class="chrome-link" hidden>Install</button>
+    <button type="button" id="btn-ios-tip" class="chrome-link" hidden>Add to Home Screen</button>
+    <a class="chrome-link" href="https://github.com/Quad4-Software/transcriptasm" rel="noopener noreferrer" target="_blank">Source</a>
+  </div>
+  <div id="ios-tip-panel" class="ios-tip" hidden>
+    On iPhone: tap Share, then Add to Home Screen.
+  </div>
   <div class="atmosphere" aria-hidden="true"></div>
+  <div id="drop-overlay" class="drop-overlay" hidden aria-hidden="true">
+    <p>Drop audio or video to transcribe</p>
+  </div>
   <main class="stage">
     <header class="brand-block">
       <p class="brand">transcriptasm</p>
       <h1 class="headline">Offline speech to text.</h1>
-      <p class="lede">Talk or drop a clip. It runs in this browser. Nothing is uploaded.</p>
+      <p class="lede">Talk, drop, or paste a clip. It runs in this browser. Nothing is uploaded.</p>
     </header>
 
     <div class="workspace">
@@ -89,10 +99,18 @@
               <span>Voice style</span>
               <select id="model"></select>
             </label>
+            <button type="button" id="btn-offline" class="linkish offline-btn">Save offline</button>
+          </div>
+          <div class="control-row toggles-row">
             <label class="toggle" for="timestamps">
               <input type="checkbox" id="timestamps" checked>
               <span class="toggle-ui" aria-hidden="true"></span>
               <span class="toggle-label">Show times</span>
+            </label>
+            <label class="toggle" for="translate" title="Needs an any-language voice style.">
+              <input type="checkbox" id="translate" disabled>
+              <span class="toggle-ui" aria-hidden="true"></span>
+              <span class="toggle-label">Translate</span>
             </label>
           </div>
 
@@ -127,7 +145,15 @@
           <h2>Transcript</h2>
           <div class="result-actions">
             <button type="button" id="btn-copy" class="linkish" disabled>Copy</button>
-            <button type="button" id="btn-download" class="linkish" disabled>Download</button>
+            <div class="export-wrap">
+              <button type="button" id="btn-export" class="linkish" disabled aria-haspopup="menu" aria-expanded="false">Export</button>
+              <div id="export-menu" class="export-menu" role="menu" hidden>
+                <button type="button" role="menuitem" data-format="txt">TXT</button>
+                <button type="button" role="menuitem" data-format="srt">SRT</button>
+                <button type="button" role="menuitem" data-format="vtt">VTT</button>
+                <button type="button" role="menuitem" data-format="json">JSON</button>
+              </div>
+            </div>
             <button type="button" id="btn-clear" class="linkish" disabled>Clear</button>
           </div>
         </div>

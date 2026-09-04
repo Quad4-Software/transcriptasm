@@ -23,6 +23,92 @@ export async function registerPWA() {
 }
 
 /**
+ * @param {{
+ *   installBtn: HTMLButtonElement,
+ *   iosTipBtn: HTMLButtonElement,
+ *   iosTipPanel: HTMLElement,
+ * }} els
+ */
+export function setupInstallAffordance(els) {
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    /** @type {any} */ (navigator).standalone === true;
+
+  if (standalone) {
+    els.installBtn.hidden = true;
+    els.iosTipBtn.hidden = true;
+    els.iosTipPanel.hidden = true;
+    return;
+  }
+
+  /** @type {any} */
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', (ev) => {
+    ev.preventDefault();
+    deferred = ev;
+    els.installBtn.hidden = false;
+  });
+
+  els.installBtn.addEventListener('click', async () => {
+    if (!deferred) {
+      return;
+    }
+    els.installBtn.hidden = true;
+    deferred.prompt();
+    try {
+      await deferred.userChoice;
+    } catch {
+      /* ignore */
+    }
+    deferred = null;
+  });
+
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isSafari = /safari/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
+  if (isIos && isSafari) {
+    els.iosTipBtn.hidden = false;
+    els.iosTipBtn.addEventListener('click', () => {
+      els.iosTipPanel.hidden = !els.iosTipPanel.hidden;
+    });
+  }
+}
+
+/**
+ * Ask the service worker to cache model URLs in the asset cache.
+ * @param {string[]} urls
+ * @param {(done: number, total: number) => void} [onProgress]
+ */
+export async function cacheModelUrls(urls, onProgress) {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Offline saving needs a service worker.');
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const worker = reg.active || navigator.serviceWorker.controller;
+  if (!worker) {
+    throw new Error('Service worker is not active yet. Refresh once.');
+  }
+
+  return new Promise((resolve, reject) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = (ev) => {
+      const data = ev.data || {};
+      if (data.type === 'CACHE_PROGRESS') {
+        onProgress?.(data.done | 0, data.total | 0);
+        return;
+      }
+      if (data.type === 'CACHE_DONE') {
+        resolve(undefined);
+        return;
+      }
+      if (data.type === 'CACHE_ERROR') {
+        reject(new Error(data.error || 'Could not cache models.'));
+      }
+    };
+    worker.postMessage({ type: 'CACHE_URLS', urls }, [channel.port2]);
+  });
+}
+
+/**
  * @param {ServiceWorkerRegistration} reg
  */
 function wireAutoUpdate(reg) {
@@ -32,7 +118,6 @@ function wireAutoUpdate(reg) {
     if (refreshing) {
       return;
     }
-    // First SW claim: ensureCrossOriginIsolated reloads for COOP/COEP.
     if (!globalThis.crossOriginIsolated) {
       return;
     }

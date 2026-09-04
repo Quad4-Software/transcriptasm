@@ -75,11 +75,21 @@ body {
   padding: clamp(2rem, 6vh, 4rem) 0 3.5rem;
 }
 
-.source-link {
+.chrome-top {
   position: fixed;
   top: 1rem;
   right: 1.15rem;
-  z-index: 5;
+  z-index: 6;
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.chrome-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--ink-soft);
   font-family: var(--font-display);
   font-size: 0.82rem;
@@ -87,11 +97,93 @@ body {
   letter-spacing: 0.04em;
   text-decoration: none;
   text-transform: uppercase;
+  cursor: pointer;
 }
 
-.source-link:hover,
-.source-link:focus-visible {
+.chrome-link:hover,
+.chrome-link:focus-visible {
   color: var(--accent);
+  outline: none;
+}
+
+.ios-tip {
+  position: fixed;
+  top: 2.75rem;
+  right: 1.15rem;
+  z-index: 6;
+  max-width: 16rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  place-items: center;
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none;
+}
+
+.drop-overlay p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.drop-overlay.is-on {
+  display: grid;
+}
+
+.toggles-row {
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+}
+
+.offline-btn {
+  align-self: end;
+  margin-bottom: 0.15rem;
+}
+
+.export-wrap {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 4;
+  min-width: 6.5rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  display: grid;
+  gap: 0.1rem;
+}
+
+.export-menu button {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+}
+
+.export-menu button:hover,
+.export-menu button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   outline: none;
 }
 
@@ -609,8 +701,13 @@ body {
 }
 
 @media (max-width: 900px) {
-  .source-link {
+  .chrome-top {
     top: 0.75rem;
+    right: 0.85rem;
+  }
+
+  .ios-tip {
+    top: 2.4rem;
     right: 0.85rem;
   }
 
