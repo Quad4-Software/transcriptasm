@@ -448,7 +448,9 @@ export async function bootApp() {
           translate: wantTranslate(),
         });
         const shifted = shiftChunks(result.chunks || [], job.t0);
-        liveChunks = liveChunks.concat(shifted);
+        for (let i = 0; i < shifted.length; i++) {
+          liveChunks.push(shifted[i]);
+        }
         liveHadPartials = liveChunks.length > 0;
         lastResult = {
           text: liveChunks.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim(),

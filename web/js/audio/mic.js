@@ -64,13 +64,20 @@ export class MicRecorder {
       this.processor = this.audioCtx.createScriptProcessor(bufferSize, 1, 1);
       this.processor.onaudioprocess = (ev) => {
         const input = ev.inputBuffer.getChannelData(0);
-        this.pcm.push(input);
-        if (this.onFrame) {
-          const rate = this.audioCtx ? this.audioCtx.sampleRate : TARGET_SAMPLE_RATE;
-          const frame = resampleLinear(input, rate, TARGET_SAMPLE_RATE, this.frameScratch || undefined);
+        const rate = this.audioCtx ? this.audioCtx.sampleRate : TARGET_SAMPLE_RATE;
+        /** @type {Float32Array} */
+        let frame;
+        if (rate === TARGET_SAMPLE_RATE) {
+          frame = input;
+        } else {
+          frame = resampleLinear(input, rate, TARGET_SAMPLE_RATE, this.frameScratch || undefined);
           if (frame.length && (!this.frameScratch || this.frameScratch.length !== frame.length)) {
             this.frameScratch = frame;
           }
+        }
+        // Store 16 kHz only so long recordings stay ~3x smaller than native 48 kHz capture.
+        this.pcm.push(frame);
+        if (this.onFrame) {
           this.onFrame(frame);
         }
       };
@@ -108,13 +115,12 @@ export class MicRecorder {
   /** @returns {Promise<Float32Array>} */
   async stop() {
     if (this.mode === 'pcm') {
-      const rate = this.audioCtx ? this.audioCtx.sampleRate : TARGET_SAMPLE_RATE;
       const raw = this.pcm.take();
       this.cleanup();
       if (!raw.length) {
         throw new Error('no mic samples captured');
       }
-      return resampleLinear(raw, rate, TARGET_SAMPLE_RATE);
+      return raw;
     }
 
     const blob = await new Promise((resolve, reject) => {

@@ -38,6 +38,27 @@ test('GrowablePCM grows and take copies', () => {
   assert.equal(g.length, 0);
 });
 
+test('GrowablePCM take(n) copies prefix and pushSample works', () => {
+  const g = new GrowablePCM(2);
+  g.pushSample(1);
+  g.pushSample(2);
+  g.pushSample(3);
+  assert.equal(g.length, 3);
+  const part = g.take(2);
+  assert.deepEqual([...part], [1, 2]);
+  assert.equal(g.length, 0);
+});
+
+test('GrowablePCM shrinks oversized buffer after take', () => {
+  const g = new GrowablePCM(4);
+  const chunk = new Float32Array(64);
+  chunk.fill(0.5);
+  g.push(chunk);
+  assert.ok(g.buf.length > 8);
+  g.take();
+  assert.equal(g.buf.length, 4);
+});
+
 test('decodeWavPCM reads sample jfk wav', () => {
   const bytes = new Uint8Array(readFileSync(join(root, 'web/samples/jfk.wav')));
   const pcm = decodeWavPCM(bytes);

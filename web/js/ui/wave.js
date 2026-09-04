@@ -145,18 +145,31 @@ export function createWaveController(canvas) {
   function start() {
     resize();
     cancelAnimationFrame(raf);
-    draw();
+    if (!document.hidden) {
+      draw();
+    }
   }
 
   function stop() {
     cancelAnimationFrame(raf);
+    raf = 0;
   }
 
   window.addEventListener('resize', () => {
     resize();
-    if (reduced) {
+    if (reduced && !document.hidden) {
       draw();
     }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      return;
+    }
+    cancelAnimationFrame(raf);
+    draw();
   });
 
   return { start, stop, setLiveData, setRecording, setMode };

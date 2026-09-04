@@ -167,11 +167,17 @@ export function createWhisperCppEngine() {
             status: 'transcribing',
             progress: Math.min(0.92, 0.08 + segCount * 0.07),
           });
-          if (segCount > 0 && typeof mod.get_segment_count === 'function') {
-            const partial = readSegments(mod, sharedInstance, true);
-            liveChunks = toLiveChunks(partial.chunks);
-            flushPartial(false);
+          if (segCount <= 0 || typeof mod.get_segment_count !== 'function') {
+            return;
           }
+          // Skip segment materialization when the UI would drop the partial anyway.
+          const now = performance.now();
+          if (lastPartialAt !== 0 && now - lastPartialAt < PARTIAL_MIN_MS) {
+            return;
+          }
+          const partial = readSegments(mod, sharedInstance, true);
+          liveChunks = toLiveChunks(partial.chunks);
+          flushPartial(false);
         },
       });
 
@@ -353,6 +359,40 @@ async function fetchModelBytes(path, onProgress) {
   }
 
   const reader = res.body.getReader();
+
+  // Prefer one preallocated buffer when Content-Length is known to avoid
+  // holding every network chunk plus a final concat copy.
+  if (hinted > 0) {
+    let out = new Uint8Array(hinted);
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value || value.length === 0) {
+        continue;
+      }
+      if (received + value.length > out.length) {
+        const next = new Uint8Array(Math.max(received + value.length, out.length * 2));
+        next.set(out.subarray(0, received));
+        out = next;
+      }
+      out.set(value, received);
+      received += value.length;
+      onProgress?.({
+        status: 'fetching model',
+        progress: Math.min(0.95, received / Math.max(hinted, received)),
+        file: path,
+      });
+    }
+    onProgress?.({ status: 'fetching model', progress: 1, file: path });
+    if (received === out.length) {
+      return ensurePlainBytes(out);
+    }
+    return ensurePlainBytes(out.subarray(0, received));
+  }
+
   /** @type {Uint8Array[]} */
   const parts = [];
   let received = 0;
@@ -366,10 +406,9 @@ async function fetchModelBytes(path, onProgress) {
     }
     parts.push(value);
     received += value.length;
-    const denom = hinted > 0 ? Math.max(hinted, received) : 0;
     onProgress?.({
       status: 'fetching model',
-      progress: denom ? Math.min(0.95, received / denom) : 0.5,
+      progress: 0.5,
       file: path,
     });
   }

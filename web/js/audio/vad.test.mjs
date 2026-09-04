@@ -54,3 +54,24 @@ test('vad max chunk splits long speech', () => {
   vad.push(long);
   assert.ok(lens.length >= 2);
 });
+
+test('vad emit returns standalone Float32Array', () => {
+  /** @type {Float32Array[]} */
+  const ends = [];
+  const vad = createEnergyVad({
+    onSpeechEnd: (pcm) => ends.push(pcm),
+    threshold: 0.02,
+    hangoverMs: 50,
+    minSpeechMs: 20,
+    maxChunkMs: 5000,
+    sampleRate: 16000,
+  });
+  const speech = new Float32Array(800);
+  speech.fill(0.25);
+  vad.push(speech);
+  vad.flush();
+  assert.equal(ends.length, 1);
+  assert.ok(ends[0] instanceof Float32Array);
+  assert.equal(ends[0].byteOffset, 0);
+  assert.equal(ends[0].buffer.byteLength, ends[0].byteLength);
+});

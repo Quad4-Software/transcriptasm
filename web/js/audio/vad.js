@@ -2,6 +2,8 @@
  * Energy / RMS voice-activity detector for 16 kHz mono PCM.
  */
 
+import { GrowablePCM } from './pcm-buffer.js';
+
 /**
  * @typedef {object} EnergyVadOptions
  * @property {(pcm: Float32Array, t0: number, t1: number) => void} onSpeechEnd
@@ -22,8 +24,7 @@ export function createEnergyVad(opts) {
   const minSpeechSamples = Math.max(1, Math.round(((opts.minSpeechMs ?? 300) / 1000) * sampleRate));
   const maxChunkSamples = Math.max(minSpeechSamples, Math.round(((opts.maxChunkMs ?? 12000) / 1000) * sampleRate));
 
-  /** @type {number[]} */
-  let buf = [];
+  const buf = new GrowablePCM(maxChunkSamples);
   let inSpeech = false;
   let silenceRun = 0;
   let absoluteOffset = 0;
@@ -38,20 +39,20 @@ export function createEnergyVad(opts) {
     }
     for (let i = 0; i < frame.length; i++) {
       const sample = frame[i];
-      const energy = sample * sample;
-      const voiced = Math.sqrt(energy) >= threshold;
+      const voiced = sample >= threshold || sample <= -threshold;
 
       if (!inSpeech) {
         if (voiced) {
           inSpeech = true;
           silenceRun = 0;
           speechStartAbs = absoluteOffset + i;
-          buf = [sample];
+          buf.reset();
+          buf.pushSample(sample);
         }
         continue;
       }
 
-      buf.push(sample);
+      buf.pushSample(sample);
       if (voiced) {
         silenceRun = 0;
       } else {
@@ -83,7 +84,7 @@ export function createEnergyVad(opts) {
       resetSpeech();
       return;
     }
-    const pcm = Float32Array.from(buf.slice(0, keep));
+    const pcm = buf.take(keep);
     const t0 = speechStartAbs / sampleRate;
     const t1 = (speechStartAbs + keep) / sampleRate;
     resetSpeech();
@@ -95,9 +96,10 @@ export function createEnergyVad(opts) {
       resetSpeech();
       return;
     }
-    const pcm = Float32Array.from(buf);
+    const n = buf.length;
+    const pcm = buf.take();
     const t0 = speechStartAbs / sampleRate;
-    const t1 = (speechStartAbs + buf.length) / sampleRate;
+    const t1 = (speechStartAbs + n) / sampleRate;
     resetSpeech();
     opts.onSpeechEnd(pcm, t0, t1);
   }
@@ -105,7 +107,7 @@ export function createEnergyVad(opts) {
   function resetSpeech() {
     inSpeech = false;
     silenceRun = 0;
-    buf = [];
+    buf.reset();
   }
 
   return { push, flush };
