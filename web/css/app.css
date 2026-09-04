@@ -148,11 +148,6 @@ body {
   gap: 0.85rem 1.25rem;
 }
 
-.offline-btn {
-  align-self: end;
-  margin-bottom: 0.15rem;
-}
-
 .export-wrap {
   position: relative;
 }
@@ -166,8 +161,12 @@ body {
   padding: 0.25rem;
   border: 1px solid var(--line);
   background: var(--panel-2);
-  display: grid;
+  display: none;
   gap: 0.1rem;
+}
+
+.export-menu.is-open {
+  display: grid;
 }
 
 .export-menu button {

@@ -23,7 +23,6 @@ export async function bootApp() {
     btnExport: /** @type {HTMLButtonElement} */ (document.getElementById('btn-export')),
     exportMenu: /** @type {HTMLElement} */ (document.getElementById('export-menu')),
     btnClear: /** @type {HTMLButtonElement} */ (document.getElementById('btn-clear')),
-    btnOffline: /** @type {HTMLButtonElement} */ (document.getElementById('btn-offline')),
     btnInstall: /** @type {HTMLButtonElement} */ (document.getElementById('btn-install')),
     btnIosTip: /** @type {HTMLButtonElement} */ (document.getElementById('btn-ios-tip')),
     iosTipPanel: /** @type {HTMLElement} */ (document.getElementById('ios-tip-panel')),
@@ -161,7 +160,6 @@ export async function bootApp() {
     }
   });
   els.btnClear.addEventListener('click', () => clearTranscript());
-  els.btnOffline.addEventListener('click', () => void saveOffline());
   els.model.addEventListener('change', () => {
     loadedModelId = '';
     syncTranslateToggle();
@@ -259,7 +257,24 @@ export async function bootApp() {
     });
     loadedModelId = model.id;
     hideProgress();
+    void cacheModelsQuietly([model.path, ...models.filter((m) => !m.optional).map((m) => m.path)]);
     return model;
+  }
+
+  /**
+   * Cache model URLs in the SW asset cache without blocking the UI.
+   * @param {string[]} paths
+   */
+  async function cacheModelsQuietly(paths) {
+    const urls = [...new Set(paths.filter(Boolean))];
+    if (urls.length === 0) {
+      return;
+    }
+    try {
+      await cacheModelUrls(urls);
+    } catch {
+      /* offline save is best-effort */
+    }
   }
 
   async function startMic() {
@@ -663,7 +678,6 @@ export async function bootApp() {
     els.model.disabled = locked;
     els.timestamps.disabled = locked;
     els.translate.disabled = locked || !selectedModel()?.multilingual;
-    els.btnOffline.disabled = locked;
   }
 
   /**
@@ -739,12 +753,14 @@ export async function bootApp() {
     if (els.btnExport.disabled) {
       return;
     }
-    const open = els.exportMenu.hidden;
+    const open = !els.exportMenu.classList.contains('is-open');
+    els.exportMenu.classList.toggle('is-open', open);
     els.exportMenu.hidden = !open;
     els.btnExport.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function closeExportMenu() {
+    els.exportMenu.classList.remove('is-open');
     els.exportMenu.hidden = true;
     els.btnExport.setAttribute('aria-expanded', 'false');
   }
@@ -959,54 +975,6 @@ export async function bootApp() {
     updateActions(false);
     setStatus('Cleared. Ready when you are.');
     els.status.classList.add('is-ok');
-  }
-
-  async function saveOffline() {
-    if (busy || recording) {
-      return;
-    }
-    const required = models.filter((m) => !m.optional);
-    const selected = selectedModel();
-    /** @type {import('../engine/types.js').ModelInfo[]} */
-    const want = [];
-    const seen = new Set();
-    for (const m of required) {
-      if (!seen.has(m.path)) {
-        seen.add(m.path);
-        want.push(m);
-      }
-    }
-    if (selected && selected.optional && !seen.has(selected.path)) {
-      want.push(selected);
-    }
-    if (want.length === 0) {
-      return;
-    }
-    busy = true;
-    setControls(true);
-    setLoading(true);
-    clearError();
-    try {
-      await cacheModelUrls(
-        want.map((m) => m.path),
-        (i, total) => {
-          setStatus(`Saving ${i}/${total}...`);
-          showProgress(Math.round((i / total) * 100));
-        },
-      );
-      hideProgress();
-      setStatus('Ready offline.');
-      els.status.classList.add('is-ok');
-    } catch (err) {
-      hideProgress();
-      setStatus('Could not save models offline.');
-      showError(friendlyError(err));
-    } finally {
-      busy = false;
-      setControls(false);
-      setLoading(false);
-      syncTranslateToggle();
-    }
   }
 }
 
