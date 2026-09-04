@@ -9,3 +9,6 @@ dist/
 coverage.out
 coverage.html
 web/models/*.bin
+web/models/onnx/
+web/vendor/transformers/
+web/samples/

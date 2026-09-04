@@ -108,11 +108,23 @@ EMSCRIPTEN_BINDINGS(whisper) {
 		params.logprob_thold = -1.0f;
 		params.no_speech_thold = 0.6f;
 		params.max_len = 0;
-		params.audio_ctx = 0;
 
 		std::vector<float> pcmf32;
 		const int n = audio["length"].as<int>();
 		pcmf32.resize(n);
+
+		// Length-scaled encoder context. Fixed tiny values (e.g. 768) caused foam loops.
+		{
+			const float sec = n > 0 ? (float)n / 16000.0f : 0.0f;
+			int ctx = (int)((sec / 30.0f) * 1500.0f) + 128;
+			if (ctx < 128) {
+				ctx = 128;
+			}
+			if (ctx > 1500) {
+				ctx = 1500;
+			}
+			params.audio_ctx = ctx;
+		}
 
 		emscripten::val heap = emscripten::val::module_property("HEAPU8");
 		emscripten::val memory = heap["buffer"];

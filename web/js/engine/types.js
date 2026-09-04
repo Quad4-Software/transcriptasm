@@ -2,7 +2,23 @@
  * Shared transcription types.
  */
 
-/** @typedef {{ id: string, label: string, engine: string, path: string, language: string, size_hint_mb: number, notes?: string, default?: boolean, optional?: boolean, multilingual?: boolean, speed_rank?: number, accuracy_rank?: number }} ModelInfo */
+/**
+ * @typedef {object} ModelInfo
+ * @property {string} id
+ * @property {string} label
+ * @property {string} engine
+ * @property {string} path
+ * @property {string} language
+ * @property {number} size_hint_mb
+ * @property {string} [notes]
+ * @property {boolean} [default]
+ * @property {boolean} [optional]
+ * @property {boolean} [multilingual]
+ * @property {number} [speed_rank]
+ * @property {number} [accuracy_rank]
+ * @property {string} [onnx_id]
+ * @property {string} [onnx_path]
+ */
 
 /** @typedef {{ text: string, chunks?: Array<{ text: string, timestamp?: [number|null, number|null] }> }} TranscriptResult */
 
@@ -21,6 +37,7 @@
 /**
  * @typedef {object} Engine
  * @property {string} id
+ * @property {() => string} [getBackend]
  * @property {(model: ModelInfo, onProgress?: (ev: ProgressEvent) => void) => Promise<void>} load
  * @property {(audio: Float32Array, opts?: TranscribeOptions) => Promise<TranscriptResult>} transcribe
  * @property {() => void} dispose

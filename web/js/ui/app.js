@@ -1,5 +1,7 @@
 import { createEngine, registerEngine } from '../engine/registry.js';
 import { createWhisperCppEngine } from '../engine/whisper-cpp.js';
+import { createWhisperWebGPUEngine } from '../engine/whisper-webgpu.js';
+import { createAutoEngine } from '../engine/auto.js';
 import { decodeToWhisperPCM } from '../audio/decode.js';
 import { MicRecorder } from '../audio/mic.js';
 import { createEnergyVad } from '../audio/vad.js';
@@ -9,6 +11,8 @@ import { createWaveController } from './wave.js';
 import { cacheModelUrls, setupInstallAffordance } from '../pwa.js';
 
 registerEngine('whisper-cpp', createWhisperCppEngine);
+registerEngine('whisper-webgpu', createWhisperWebGPUEngine);
+registerEngine('auto', createAutoEngine);
 
 /**
  * Wire the page UI.
@@ -247,9 +251,13 @@ export async function bootApp() {
       if (typeof p.progress === 'number') {
         showProgress(Math.round(p.progress * 100));
       }
-      if (p.status === 'fetching model') {
+      if (p.status === 'fetching model' || p.status === 'loading webgpu' || p.status === 'loading webgpu model') {
         setStatus(`Loading ${model.label}...`);
-      } else if (p.status === 'initializing model' || p.status === 'loading wasm') {
+      } else if (
+        p.status === 'initializing model'
+        || p.status === 'loading wasm'
+        || p.status === 'loading wasm fallback'
+      ) {
         setStatus('Almost ready...');
       } else if (p.status === 'model ready' || p.status === 'model cached') {
         setStatus(`${model.label} is ready.`);
@@ -257,8 +265,42 @@ export async function bootApp() {
     });
     loadedModelId = model.id;
     hideProgress();
-    void cacheModelsQuietly([model.path, ...models.filter((m) => !m.optional).map((m) => m.path)]);
+    void cacheModelsQuietly(collectCachePaths(model));
     return model;
+  }
+
+  /**
+   * @param {import('../engine/types.js').ModelInfo} model
+   * @returns {string[]}
+   */
+  function collectCachePaths(model) {
+    /** @type {string[]} */
+    const paths = [];
+    const addModel = (m) => {
+      if (!m) {
+        return;
+      }
+      if (m.path) {
+        paths.push(m.path);
+      }
+      if (m.onnx_path) {
+        paths.push(
+          `${m.onnx_path}/config.json`,
+          `${m.onnx_path}/tokenizer.json`,
+          `${m.onnx_path}/tokenizer_config.json`,
+          `${m.onnx_path}/preprocessor_config.json`,
+          `${m.onnx_path}/onnx/encoder_model.onnx`,
+          `${m.onnx_path}/onnx/decoder_model_merged_q4.onnx`,
+        );
+      }
+    };
+    addModel(model);
+    for (const m of models) {
+      if (!m.optional) {
+        addModel(m);
+      }
+    }
+    return paths;
   }
 
   /**
@@ -451,10 +493,19 @@ export async function bootApp() {
     els.transcript.classList.remove('is-live');
     hideProgress();
     els.meta.hidden = false;
-    els.meta.textContent = `${seconds.toFixed(1)}s audio in ${(ms / 1000).toFixed(1)}s (${rtf.toFixed(2)}x) using ${model?.label || 'model'}`;
+    els.meta.textContent = `${seconds.toFixed(1)}s audio in ${(ms / 1000).toFixed(1)}s (${rtf.toFixed(2)}x) using ${formatModelMeta(model)}`;
     setStatus('Done. Still just on this device.');
     els.status.classList.add('is-ok');
     updateActions(!!(lastResult && (lastResult.text || (lastResult.chunks && lastResult.chunks.length))));
+  }
+
+  /**
+   * @param {import('../engine/types.js').ModelInfo | null | undefined} model
+   */
+  function formatModelMeta(model) {
+    const label = model?.label || 'model';
+    const backend = engine && typeof engine.getBackend === 'function' ? engine.getBackend() : '';
+    return backend ? `${label} · ${backend}` : label;
   }
 
   async function onFile() {
@@ -560,7 +611,7 @@ export async function bootApp() {
     const ms = Math.round(performance.now() - t0);
     const rtf = seconds > 0 ? (ms / 1000 / seconds) : 0;
     els.meta.hidden = false;
-    els.meta.textContent = `${seconds.toFixed(1)}s audio in ${(ms / 1000).toFixed(1)}s (${rtf.toFixed(2)}x) using ${model.label}`;
+    els.meta.textContent = `${seconds.toFixed(1)}s audio in ${(ms / 1000).toFixed(1)}s (${rtf.toFixed(2)}x) using ${formatModelMeta(model)}`;
     setStatus('Done. Still just on this device.');
     els.status.classList.add('is-ok');
     updateActions(!!(result.text || (result.chunks && result.chunks.length)));

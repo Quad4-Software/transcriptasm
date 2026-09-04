@@ -5,8 +5,13 @@
 
 import { MAX_AUDIO_SAMPLES, TARGET_SAMPLE_RATE } from './types.js';
 import { parseWhisperOutput } from './whisper-parse.js';
+import {
+  collapseRepeatLoops,
+  joinChunkText,
+} from './text-sanitize.js';
 
 export { parseWhisperOutput } from './whisper-parse.js';
+export { collapseRepeatLoops } from './text-sanitize.js';
 
 const WASM_DIR = '/vendor/whisper/';
 const WASM_SCRIPT = `${WASM_DIR}main.js`;
@@ -70,7 +75,7 @@ function loadModule() {
     /** @type {any} */ (window).Module = mod;
 
     const script = document.createElement('script');
-    script.src = `${WASM_SCRIPT}?v=fast-wasm`;
+    script.src = `${WASM_SCRIPT}?v=audio-ctx`;
     script.async = true;
     script.onerror = () => {
       modulePromise = null;
@@ -91,6 +96,10 @@ let lastPartialAt = 0;
 export function createWhisperCppEngine() {
   return {
     id: 'whisper-cpp',
+
+    getBackend() {
+      return 'WASM';
+    },
 
     async load(model, onProgress) {
       onProgress?.({ status: 'loading wasm' });
@@ -231,20 +240,6 @@ function flushPartial(force) {
 }
 
 /**
- * @param {Array<{ text: string }>} chunks
- */
-function joinChunkText(chunks) {
-  if (chunks.length === 0) {
-    return '';
-  }
-  let out = chunks[0].text;
-  for (let i = 1; i < chunks.length; i++) {
-    out += ' ' + chunks[i].text;
-  }
-  return out;
-}
-
-/**
  * Poll until the WASM worker finishes.
  * @param {any} mod
  * @param {number} instance
@@ -323,22 +318,6 @@ function readSegments(mod, instance, withTimestamps) {
     return { text };
   }
   return { text, chunks };
-}
-
-/**
- * Collapse runaway "word word word" loops from stuck greedy decode.
- * @param {string} text
- */
-function collapseRepeatLoops(text) {
-  if (!text) {
-    return text;
-  }
-  let out = text;
-  // Same token 4+ times in a row.
-  out = out.replace(/\b([\w']+)(?:\s+\1){3,}\b/gi, '$1');
-  // Short phrase repeated 3+ times.
-  out = out.replace(/\b((?:[\w']+\s+){0,3}[\w']+)(?:\s+\1){2,}\b/gi, '$1');
-  return out.replace(/\s{2,}/g, ' ').trim();
 }
 
 /**

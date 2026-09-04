@@ -33,7 +33,7 @@ all: assets build
 
 help:
 	@printf '%s\n' \
-		'assets        fetch offline WASM/models/fonts' \
+		'assets        fetch offline WASM/models/fonts/transformers/onnx' \
 		'build         compile $(BIN)' \
 		'run           ensure assets then serve :8080' \
 		'test          go test + node tests' \
@@ -46,6 +46,8 @@ help:
 assets:
 	@bash scripts/fetch-assets.sh
 	@bash scripts/fetch-models.sh
+	@bash scripts/fetch-transformers.sh
+	@bash scripts/fetch-onnx-models.sh
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -60,7 +62,7 @@ test-go:
 	$(GO) test $(GOFLAGS) ./...
 
 test-js:
-	$(NODE) --test web/js/audio/audio.test.mjs web/js/audio/vad.test.mjs web/js/engine/parse.test.mjs web/js/export/formats.test.mjs
+	$(NODE) --test web/js/audio/audio.test.mjs web/js/audio/vad.test.mjs web/js/engine/parse.test.mjs web/js/engine/text-sanitize.test.mjs web/js/engine/foam-regression.test.mjs web/js/export/formats.test.mjs
 
 test: test-go test-js
 

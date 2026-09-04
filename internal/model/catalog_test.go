@@ -17,8 +17,11 @@ func TestDefaultCatalog(t *testing.T) {
 	if !ok || !def.Default {
 		t.Fatalf("missing default model: %+v", def)
 	}
-	if def.Engine != model.EngineWhisperCPP {
+	if def.Engine != model.EngineAuto {
 		t.Fatalf("engine=%s", def.Engine)
+	}
+	if def.OnnxID == "" {
+		t.Fatal("missing onnx_id on default model")
 	}
 	if !strings.HasPrefix(def.Path, "/models/") {
 		t.Fatalf("path=%s", def.Path)

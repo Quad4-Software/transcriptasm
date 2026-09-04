@@ -9,6 +9,8 @@ type Engine string
 const (
 	// EngineWhisperCPP runs the vendored whisper.cpp single-file WASM build.
 	EngineWhisperCPP Engine = "whisper-cpp"
+	// EngineAuto prefers WebGPU (transformers.js) and falls back to whisper.cpp WASM.
+	EngineAuto Engine = "auto"
 )
 
 // Model is a selectable transcription model.
@@ -17,6 +19,8 @@ type Model struct {
 	Label        string  `json:"label"`
 	Engine       Engine  `json:"engine"`
 	Path         string  `json:"path"`
+	OnnxID       string  `json:"onnx_id,omitempty"`
+	OnnxPath     string  `json:"onnx_path,omitempty"`
 	Language     string  `json:"language"`
 	SizeHintMB   float64 `json:"size_hint_mb"`
 	SpeedRank    int     `json:"speed_rank"`
@@ -32,29 +36,33 @@ type Catalog struct {
 	Models []Model `json:"models"`
 }
 
-// DefaultCatalog returns built-in local ggml models (no network).
+// DefaultCatalog returns built-in local ggml + ONNX models (no network).
 func DefaultCatalog() Catalog {
 	return Catalog{
 		Models: []Model{
 			{
 				ID:           "tiny.en-q5_1",
 				Label:        "Quick",
-				Engine:       EngineWhisperCPP,
+				Engine:       EngineAuto,
 				Path:         "/models/ggml-tiny.en-q5_1.bin",
+				OnnxID:       "whisper-tiny.en",
+				OnnxPath:     "/models/onnx/whisper-tiny.en",
 				Language:     "en",
-				SizeHintMB:   31,
+				SizeHintMB:   120,
 				SpeedRank:    5,
 				AccuracyRank: 2,
 				Default:      true,
-				Notes:        "Fastest. Great for everyday notes.",
+				Notes:        "Fastest. WebGPU when available, WASM fallback.",
 			},
 			{
 				ID:           "base.en-q5_1",
 				Label:        "Clearer",
-				Engine:       EngineWhisperCPP,
+				Engine:       EngineAuto,
 				Path:         "/models/ggml-base.en-q5_1.bin",
+				OnnxID:       "whisper-base.en",
+				OnnxPath:     "/models/onnx/whisper-base.en",
 				Language:     "en",
-				SizeHintMB:   57,
+				SizeHintMB:   206,
 				SpeedRank:    3,
 				AccuracyRank: 4,
 				Notes:        "A bit slower. Catches more detail.",
@@ -62,10 +70,12 @@ func DefaultCatalog() Catalog {
 			{
 				ID:           "tiny-q5_1",
 				Label:        "Quick (any language)",
-				Engine:       EngineWhisperCPP,
+				Engine:       EngineAuto,
 				Path:         "/models/ggml-tiny-q5_1.bin",
+				OnnxID:       "whisper-tiny",
+				OnnxPath:     "/models/onnx/whisper-tiny",
 				Language:     "auto",
-				SizeHintMB:   31,
+				SizeHintMB:   120,
 				SpeedRank:    5,
 				AccuracyRank: 2,
 				Optional:     true,
@@ -75,10 +85,12 @@ func DefaultCatalog() Catalog {
 			{
 				ID:           "base-q5_1",
 				Label:        "Clearer (any language)",
-				Engine:       EngineWhisperCPP,
+				Engine:       EngineAuto,
 				Path:         "/models/ggml-base-q5_1.bin",
+				OnnxID:       "whisper-base",
+				OnnxPath:     "/models/onnx/whisper-base",
 				Language:     "auto",
-				SizeHintMB:   57,
+				SizeHintMB:   206,
 				SpeedRank:    3,
 				AccuracyRank: 4,
 				Optional:     true,
@@ -88,10 +100,12 @@ func DefaultCatalog() Catalog {
 			{
 				ID:           "small.en-q5_1",
 				Label:        "Best",
-				Engine:       EngineWhisperCPP,
+				Engine:       EngineAuto,
 				Path:         "/models/ggml-small.en-q5_1.bin",
+				OnnxID:       "whisper-small.en",
+				OnnxPath:     "/models/onnx/whisper-small.en",
 				Language:     "en",
-				SizeHintMB:   182,
+				SizeHintMB:   586,
 				SpeedRank:    1,
 				AccuracyRank: 5,
 				Optional:     true,

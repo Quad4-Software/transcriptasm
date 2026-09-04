@@ -35,9 +35,11 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM alpine:3.24@${ALPINE_DIGEST} AS models
 
-RUN apk add --no-cache curl \
-	&& mkdir -p /models \
-	&& curl -L --fail --retry 5 --retry-delay 2 \
+RUN apk add --no-cache curl bash \
+	&& mkdir -p /models /onnx /transformers
+
+# ggml WASM fallback weights
+RUN curl -L --fail --retry 5 --retry-delay 2 \
 		-o /models/ggml-tiny.en-q5_1.bin \
 		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin" \
 	&& curl -L --fail --retry 5 --retry-delay 2 \
@@ -53,6 +55,18 @@ RUN apk add --no-cache curl \
 		-o /models/ggml-small.en-q5_1.bin \
 		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin"
 
+# transformers.js + ORT for WebGPU
+ARG TRANSFORMERS_JS_VERSION=3.7.2
+RUN BASE="https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_JS_VERSION}/dist" \
+	&& curl -L --fail --retry 5 --retry-delay 2 -o /transformers/transformers.min.js "$BASE/transformers.min.js" \
+	&& curl -L --fail --retry 5 --retry-delay 2 -o /transformers/ort-wasm-simd-threaded.jsep.mjs "$BASE/ort-wasm-simd-threaded.jsep.mjs" \
+	&& curl -L --fail --retry 5 --retry-delay 2 -o /transformers/ort-wasm-simd-threaded.jsep.wasm "$BASE/ort-wasm-simd-threaded.jsep.wasm"
+
+# ONNX hybrid models (fp32 encoder + q4 decoder)
+COPY scripts/fetch-onnx-models.sh /tmp/fetch-onnx-models.sh
+RUN chmod +x /tmp/fetch-onnx-models.sh \
+	&& ONNX_OUT=/onnx-models bash /tmp/fetch-onnx-models.sh
+
 FROM alpine:3.24@${ALPINE_DIGEST} AS runtime
 
 ARG VERSION
@@ -62,7 +76,7 @@ ARG ALPINE_DIGEST
 ARG GOLANG_DIGEST
 
 LABEL org.opencontainers.image.title="transcriptasm" \
-	org.opencontainers.image.description="Offline in-browser Whisper transcription via WASM" \
+	org.opencontainers.image.description="Offline in-browser Whisper transcription via WebGPU and WASM" \
 	org.opencontainers.image.version="${VERSION}" \
 	org.opencontainers.image.revision="${REVISION}" \
 	org.opencontainers.image.created="${CREATED}" \
@@ -78,12 +92,14 @@ LABEL org.opencontainers.image.title="transcriptasm" \
 RUN apk upgrade --no-cache \
 	&& addgroup -g 65532 -S nonroot \
 	&& adduser -u 65532 -S -D -H -G nonroot nonroot \
-	&& mkdir -p /app/web/models \
+	&& mkdir -p /app/web/models /app/web/vendor/transformers \
 	&& chown -R nonroot:nonroot /app
 
 COPY --from=builder --chown=nonroot:nonroot /out/transcriptasm /app/transcriptasm
 COPY --chown=nonroot:nonroot web /app/web
 COPY --from=models --chown=nonroot:nonroot /models/ /app/web/models/
+COPY --from=models --chown=nonroot:nonroot /onnx-models/ /app/web/models/onnx/
+COPY --from=models --chown=nonroot:nonroot /transformers/ /app/web/vendor/transformers/
 
 RUN chmod 0555 /app/transcriptasm \
 	&& chmod -R a-w /app/web

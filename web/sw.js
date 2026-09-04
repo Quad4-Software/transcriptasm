@@ -1,5 +1,5 @@
 /* transcriptasm service worker: offline shell, COOP/COEP isolation, auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.2.1';
+const CACHE_VERSION = 'transcriptasm-v0.3.0';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -22,8 +22,12 @@ const PRECACHE = [
   '/js/export/formats.js',
   '/js/engine/registry.js',
   '/js/engine/types.js',
+  '/js/engine/text-sanitize.js',
   '/js/engine/whisper-cpp.js',
   '/js/engine/whisper-parse.js',
+  '/js/engine/whisper-webgpu.js',
+  '/js/engine/whisper-webgpu-worker.js',
+  '/js/engine/auto.js',
   '/icons/favicon-16.png',
   '/icons/favicon-32.png',
   '/icons/apple-touch-icon.png',
@@ -36,6 +40,9 @@ const PRECACHE = [
   '/fonts/fraunces-600.woff2',
   '/vendor/whisper/main.js',
   '/vendor/whisper/main.wasm',
+  '/vendor/transformers/transformers.min.js',
+  '/vendor/transformers/ort-wasm-simd-threaded.jsep.mjs',
+  '/vendor/transformers/ort-wasm-simd-threaded.jsep.wasm',
 ];
 
 self.addEventListener('install', (event) => {

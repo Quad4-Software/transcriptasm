@@ -220,6 +220,12 @@ func setCacheHeaders(w http.ResponseWriter, rel string) {
 	case strings.HasSuffix(rel, ".wasm"):
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		w.Header().Set("Content-Type", "application/wasm")
+	case strings.HasSuffix(rel, ".mjs"):
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	case strings.HasSuffix(rel, ".onnx"):
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.Header().Set("Content-Type", "application/octet-stream")
 	case rel == "index.html", strings.HasSuffix(rel, ".js"), strings.HasSuffix(rel, ".css"):
 		w.Header().Set("Cache-Control", "no-cache")
 	default:
