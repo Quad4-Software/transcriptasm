@@ -273,18 +273,16 @@ body {
   background: var(--record-deep);
 }
 
-.rec-dot {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.35;
+.rec-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  opacity: 0.85;
 }
 
-.cta.record.is-recording .rec-dot {
+.cta.record.is-recording .rec-icon {
   opacity: 1;
-  background: #fff;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #fff 18%, transparent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, #fff 35%, transparent));
 }
 
 .rec-timer {

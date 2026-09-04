@@ -54,8 +54,7 @@ export async function bootApp() {
 
   setBusy(true, 'Getting ready...');
   try {
-    const catalog = await fetchJSON('/api/models');
-    models = catalog.models || [];
+    models = await loadModels();
     fillModels(els.model, models);
     clearError();
     setStatus('Warming up...');
@@ -229,6 +228,11 @@ export async function bootApp() {
     const file = els.file.files && els.file.files[0];
     els.file.value = '';
     if (!file || busy || recording) {
+      return;
+    }
+    if (!isAllowedMediaFile(file)) {
+      showError('Choose an audio or video file.');
+      setStatus('That file type is not supported.');
       return;
     }
     busy = true;
@@ -497,6 +501,48 @@ function fillModels(select, models) {
     }
     select.appendChild(opt);
   }
+}
+
+/**
+ * Prefer the Go API, fall back to static catalog for GitHub Pages.
+ * @returns {Promise<import('../engine/types.js').ModelInfo[]>}
+ */
+async function loadModels() {
+  const urls = ['/api/models', '/models.json'];
+  let lastErr = /** @type {unknown} */ (null);
+  for (const url of urls) {
+    try {
+      const catalog = await fetchJSON(url);
+      const list = catalog && Array.isArray(catalog.models) ? catalog.models : [];
+      if (list.length > 0) {
+        return list;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Could not load voice styles.');
+}
+
+const MEDIA_EXTENSIONS = new Set([
+  '.wav', '.wave', '.mp3', '.ogg', '.oga', '.opus', '.flac', '.m4a', '.aac',
+  '.webm', '.mp4', '.m4v', '.mkv', '.mov', '.avi', '.mpeg', '.mpg', '.3gp',
+]);
+
+/**
+ * @param {File} file
+ */
+function isAllowedMediaFile(file) {
+  const mime = (file.type || '').toLowerCase();
+  if (mime.startsWith('audio/') || mime.startsWith('video/')) {
+    return true;
+  }
+  const name = file.name || '';
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) {
+    return false;
+  }
+  return MEDIA_EXTENSIONS.has(name.slice(dot).toLowerCase());
 }
 
 /**

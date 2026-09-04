@@ -1,0 +1,27 @@
+{
+  "models": [
+    {
+      "id": "tiny.en-q5_1",
+      "label": "Quick",
+      "engine": "whisper-cpp",
+      "path": "/models/ggml-tiny.en-q5_1.bin",
+      "language": "en",
+      "size_hint_mb": 31,
+      "speed_rank": 5,
+      "accuracy_rank": 2,
+      "default": true,
+      "notes": "Fastest. Great for everyday notes."
+    },
+    {
+      "id": "base.en-q5_1",
+      "label": "Clearer",
+      "engine": "whisper-cpp",
+      "path": "/models/ggml-base.en-q5_1.bin",
+      "language": "en",
+      "size_hint_mb": 57,
+      "speed_rank": 3,
+      "accuracy_rank": 4,
+      "notes": "A bit slower. Catches more detail."
+    }
+  ]
+}

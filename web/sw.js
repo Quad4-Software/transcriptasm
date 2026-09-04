@@ -1,5 +1,5 @@
 /* transcriptasm service worker: offline shell + auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.1.0';
+const CACHE_VERSION = 'transcriptasm-v0.1.1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -7,6 +7,7 @@ const PRECACHE = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/models.json',
   '/css/app.css',
   '/js/main.js',
   '/js/pwa.js',
