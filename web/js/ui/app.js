@@ -2,6 +2,7 @@ import { createEngine, registerEngine } from '../engine/registry.js';
 import { createWhisperCppEngine } from '../engine/whisper-cpp.js';
 import { decodeToWhisperPCM } from '../audio/decode.js';
 import { MicRecorder } from '../audio/mic.js';
+import { TARGET_SAMPLE_RATE } from '../engine/types.js';
 import { createWaveController } from './wave.js';
 
 registerEngine('whisper-cpp', createWhisperCppEngine);
@@ -51,6 +52,16 @@ export async function bootApp() {
   let warmup = null;
   /** @type {import('../engine/types.js').TranscriptResult | null} */
   let lastResult = null;
+  /** @type {Float32Array | null} */
+  let lastPCM = null;
+  /** @type {AudioContext | null} */
+  let playCtx = null;
+  /** @type {AudioBufferSourceNode | null} */
+  let playSource = null;
+  /** @type {ReturnType<typeof setTimeout> | 0} */
+  let playWatch = 0;
+  /** @type {HTMLElement | null} */
+  let activeSeg = null;
 
   setBusy(true, 'Getting ready...');
   try {
@@ -271,9 +282,11 @@ export async function bootApp() {
     if (!engine) {
       throw new Error('Voice engine is not ready.');
     }
-    const seconds = pcm.length / 16000;
+    const seconds = pcm.length / TARGET_SAMPLE_RATE;
     const t0 = performance.now();
-    setStatus('Writing it down...');
+    lastPCM = pcm;
+    stopPlayback();
+    setStatus('Transcribing...');
     setLive(true);
     showProgress(8);
     els.transcript.classList.add('is-live');
@@ -424,21 +437,128 @@ export async function bootApp() {
     if (withTimestamps && result.chunks && result.chunks.length) {
       els.transcript.replaceChildren();
       for (const c of result.chunks) {
-        const row = document.createElement('span');
+        const row = document.createElement('div');
         row.className = 'seg';
+        const start = c.timestamp && c.timestamp[0] != null ? Number(c.timestamp[0]) : null;
+        const end = c.timestamp && c.timestamp[1] != null ? Number(c.timestamp[1]) : null;
+        if (start != null) {
+          row.dataset.start = String(start);
+          if (end != null) {
+            row.dataset.end = String(end);
+          }
+        }
         const ts = formatTimestamp(c.timestamp);
         if (ts) {
-          const time = document.createElement('span');
+          const time = document.createElement('button');
+          time.type = 'button';
           time.className = 'seg-time';
           time.textContent = ts;
+          time.title = start != null ? `Play from ${formatTime(start)}` : '';
+          time.setAttribute('aria-label', start != null ? `Play from ${formatTime(start)}` : 'Timestamp');
+          if (start == null || !lastPCM) {
+            time.disabled = true;
+          } else {
+            time.addEventListener('click', () => {
+              void playFrom(start, end, row);
+            });
+          }
           row.appendChild(time);
         }
-        row.appendChild(document.createTextNode(c.text.trim()));
+        const text = document.createElement('span');
+        text.className = 'seg-text';
+        text.textContent = c.text.trim();
+        row.appendChild(text);
         els.transcript.appendChild(row);
       }
       return;
     }
     els.transcript.textContent = (result.text || '').trim();
+  }
+
+  /**
+   * @param {number} startSec
+   * @param {number | null} [endSec]
+   * @param {HTMLElement} [segEl]
+   */
+  async function playFrom(startSec, endSec, segEl) {
+    if (!lastPCM || lastPCM.length === 0) {
+      return;
+    }
+    stopPlayback();
+    const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!AC) {
+      showError('Playback is not available in this browser.');
+      return;
+    }
+    if (!playCtx) {
+      playCtx = new AC();
+    }
+    if (playCtx.state === 'suspended') {
+      await playCtx.resume();
+    }
+
+    const startSample = Math.max(0, Math.min(lastPCM.length - 1, Math.floor(startSec * TARGET_SAMPLE_RATE)));
+    let endSample = lastPCM.length;
+    if (typeof endSec === 'number' && Number.isFinite(endSec) && endSec > startSec) {
+      endSample = Math.max(startSample + 1, Math.min(lastPCM.length, Math.ceil(endSec * TARGET_SAMPLE_RATE)));
+    }
+    const slice = lastPCM.subarray(startSample, endSample);
+    if (!slice.length) {
+      return;
+    }
+
+    const copy = new Float32Array(slice.length);
+    copy.set(slice);
+    const buf = playCtx.createBuffer(1, copy.length, TARGET_SAMPLE_RATE);
+    buf.copyToChannel(copy, 0);
+
+    const src = playCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(playCtx.destination);
+    playSource = src;
+
+    if (segEl) {
+      activeSeg = segEl;
+      segEl.classList.add('is-active');
+      segEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    const durationMs = (copy.length / TARGET_SAMPLE_RATE) * 1000;
+    src.onended = () => {
+      if (playSource === src) {
+        clearActiveSeg();
+        playSource = null;
+      }
+    };
+    src.start();
+    playWatch = window.setTimeout(() => {
+      if (playSource === src) {
+        clearActiveSeg();
+      }
+    }, durationMs + 40);
+    setStatus(`Playing from ${formatTime(startSec)}`);
+  }
+
+  function stopPlayback() {
+    window.clearTimeout(playWatch);
+    playWatch = 0;
+    if (playSource) {
+      try {
+        playSource.stop();
+      } catch {
+        /* already stopped */
+      }
+      playSource.disconnect();
+      playSource = null;
+    }
+    clearActiveSeg();
+  }
+
+  function clearActiveSeg() {
+    if (activeSeg) {
+      activeSeg.classList.remove('is-active');
+      activeSeg = null;
+    }
   }
 
   function transcriptPlain() {
@@ -476,7 +596,9 @@ export async function bootApp() {
   }
 
   function clearTranscript() {
+    stopPlayback();
     lastResult = null;
+    lastPCM = null;
     els.transcript.replaceChildren();
     els.meta.hidden = true;
     els.meta.textContent = '';

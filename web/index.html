@@ -27,60 +27,64 @@
       <p class="lede">Talk or drop a clip. It runs in this browser. Nothing is uploaded.</p>
     </header>
 
-    <section class="hero-visual" aria-hidden="true">
-      <canvas id="wave" width="1200" height="280"></canvas>
-    </section>
-
-    <section class="controls" aria-label="Controls">
-      <div class="control-row">
-        <label class="field">
-          <span>Voice style</span>
-          <select id="model"></select>
-        </label>
-        <label class="toggle" for="timestamps">
-          <input type="checkbox" id="timestamps" checked>
-          <span class="toggle-ui" aria-hidden="true"></span>
-          <span class="toggle-label">Show times</span>
-        </label>
-      </div>
-
-      <div class="cta-row">
-        <button type="button" id="btn-mic" class="cta record" aria-pressed="false">
-          <svg class="rec-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-            <path fill="currentColor" d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3m7 9c0 3.53-2.61 6.44-6 6.93V21h-2v-3.07c-3.39-.49-6-3.4-6-6.93h2a5 5 0 0 0 10 0z"/>
-          </svg>
-          <span class="rec-label">Record</span>
-          <span class="rec-timer" id="rec-timer" hidden>0:00</span>
-        </button>
-        <label class="cta secondary file-cta">
-          Upload a file
-          <input type="file" id="file" accept="audio/*,video/*,.wav,.wave,.mp3,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm,.mp4,.m4v,.mkv,.mov,.avi,.mpeg,.mpg,.3gp" hidden>
-        </label>
-      </div>
-
-      <div class="status-row">
-        <span id="live-pill" class="live-pill" aria-hidden="true">Live</span>
-        <span id="spinner" class="spinner" hidden aria-hidden="true"></span>
-        <p id="status" class="status" role="status">Getting ready...</p>
-      </div>
-      <div class="progress-track" hidden>
-        <div id="progress" class="progress-bar"></div>
-      </div>
-      <p id="error" class="error" role="alert" hidden></p>
-    </section>
-
-    <section class="result" aria-label="Transcript">
-      <div class="result-toolbar">
-        <h2>Your transcript</h2>
-        <div class="result-actions">
-          <button type="button" id="btn-copy" class="linkish" disabled>Copy</button>
-          <button type="button" id="btn-download" class="linkish" disabled>Download</button>
-          <button type="button" id="btn-clear" class="linkish" disabled>Clear</button>
+    <div class="workspace">
+      <section class="panel panel-input" aria-label="Capture">
+        <div class="hero-visual" aria-hidden="true">
+          <canvas id="wave" width="1200" height="280"></canvas>
         </div>
-      </div>
-      <div id="transcript" class="transcript" tabindex="0" aria-live="polite"></div>
-      <p id="meta" class="meta" hidden></p>
-    </section>
+
+        <div class="controls">
+          <div class="control-row">
+            <label class="field">
+              <span>Voice style</span>
+              <select id="model"></select>
+            </label>
+            <label class="toggle" for="timestamps">
+              <input type="checkbox" id="timestamps" checked>
+              <span class="toggle-ui" aria-hidden="true"></span>
+              <span class="toggle-label">Show times</span>
+            </label>
+          </div>
+
+          <div class="cta-row">
+            <button type="button" id="btn-mic" class="cta record" aria-pressed="false">
+              <svg class="rec-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3m7 9c0 3.53-2.61 6.44-6 6.93V21h-2v-3.07c-3.39-.49-6-3.4-6-6.93h2a5 5 0 0 0 10 0z"/>
+              </svg>
+              <span class="rec-label">Record</span>
+              <span class="rec-timer" id="rec-timer" hidden>0:00</span>
+            </button>
+            <label class="cta secondary file-cta">
+              Upload a file
+              <input type="file" id="file" accept="audio/*,video/*,.wav,.wave,.mp3,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm,.mp4,.m4v,.mkv,.mov,.avi,.mpeg,.mpg,.3gp" hidden>
+            </label>
+          </div>
+
+          <div class="status-row">
+            <span id="live-pill" class="live-pill" aria-hidden="true">Live</span>
+            <span id="spinner" class="spinner" hidden aria-hidden="true"></span>
+            <p id="status" class="status" role="status">Getting ready...</p>
+          </div>
+          <div class="progress-track" hidden>
+            <div id="progress" class="progress-bar"></div>
+          </div>
+          <p id="error" class="error" role="alert" hidden></p>
+        </div>
+      </section>
+
+      <section class="panel panel-result" aria-label="Transcript">
+        <div class="result-toolbar">
+          <h2>Transcript</h2>
+          <div class="result-actions">
+            <button type="button" id="btn-copy" class="linkish" disabled>Copy</button>
+            <button type="button" id="btn-download" class="linkish" disabled>Download</button>
+            <button type="button" id="btn-clear" class="linkish" disabled>Clear</button>
+          </div>
+        </div>
+        <div id="transcript" class="transcript" tabindex="0" aria-live="polite"></div>
+        <p id="meta" class="meta" hidden></p>
+      </section>
+    </div>
   </main>
   <script type="module" src="/js/main.js"></script>
 </body>
