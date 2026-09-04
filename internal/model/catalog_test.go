@@ -33,6 +33,22 @@ func TestDefaultCatalog(t *testing.T) {
 	}
 }
 
+func TestOptionalAndMultilingual(t *testing.T) {
+	t.Parallel()
+	c := model.DefaultCatalog()
+	tinyMulti, ok := c.ByID("tiny-q5_1")
+	if !ok || !tinyMulti.Optional || !tinyMulti.Multilingual {
+		t.Fatalf("tiny-q5_1 flags: %+v", tinyMulti)
+	}
+	best, ok := c.ByID("small.en-q5_1")
+	if !ok || !best.Optional || best.Multilingual {
+		t.Fatalf("small.en flags: %+v", best)
+	}
+	if len(c.Models) < 5 {
+		t.Fatalf("expected at least 5 models, got %d", len(c.Models))
+	}
+}
+
 func TestByIDMissing(t *testing.T) {
 	t.Parallel()
 	_, ok := model.DefaultCatalog().ByID("nope")
@@ -40,3 +56,4 @@ func TestByIDMissing(t *testing.T) {
 		t.Fatal("expected miss")
 	}
 }
+

@@ -42,7 +42,16 @@ RUN apk add --no-cache curl \
 		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin" \
 	&& curl -L --fail --retry 5 --retry-delay 2 \
 		-o /models/ggml-base.en-q5_1.bin \
-		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin"
+		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin" \
+	&& curl -L --fail --retry 5 --retry-delay 2 \
+		-o /models/ggml-tiny-q5_1.bin \
+		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-q5_1.bin" \
+	&& curl -L --fail --retry 5 --retry-delay 2 \
+		-o /models/ggml-base-q5_1.bin \
+		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin" \
+	&& curl -L --fail --retry 5 --retry-delay 2 \
+		-o /models/ggml-small.en-q5_1.bin \
+		"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin"
 
 FROM alpine:3.24@${ALPINE_DIGEST} AS runtime
 

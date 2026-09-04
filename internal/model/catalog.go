@@ -22,6 +22,8 @@ type Model struct {
 	SpeedRank    int     `json:"speed_rank"`
 	AccuracyRank int     `json:"accuracy_rank"`
 	Default      bool    `json:"default,omitempty"`
+	Optional     bool    `json:"optional,omitempty"`
+	Multilingual bool    `json:"multilingual,omitempty"`
 	Notes        string  `json:"notes,omitempty"`
 }
 
@@ -56,6 +58,44 @@ func DefaultCatalog() Catalog {
 				SpeedRank:    3,
 				AccuracyRank: 4,
 				Notes:        "A bit slower. Catches more detail.",
+			},
+			{
+				ID:           "tiny-q5_1",
+				Label:        "Quick (any language)",
+				Engine:       EngineWhisperCPP,
+				Path:         "/models/ggml-tiny-q5_1.bin",
+				Language:     "auto",
+				SizeHintMB:   31,
+				SpeedRank:    5,
+				AccuracyRank: 2,
+				Optional:     true,
+				Multilingual: true,
+				Notes:        "Fast multilingual. Use with Translate for English text.",
+			},
+			{
+				ID:           "base-q5_1",
+				Label:        "Clearer (any language)",
+				Engine:       EngineWhisperCPP,
+				Path:         "/models/ggml-base-q5_1.bin",
+				Language:     "auto",
+				SizeHintMB:   57,
+				SpeedRank:    3,
+				AccuracyRank: 4,
+				Optional:     true,
+				Multilingual: true,
+				Notes:        "Clearer multilingual. Use with Translate for English text.",
+			},
+			{
+				ID:           "small.en-q5_1",
+				Label:        "Best",
+				Engine:       EngineWhisperCPP,
+				Path:         "/models/ggml-small.en-q5_1.bin",
+				Language:     "en",
+				SizeHintMB:   182,
+				SpeedRank:    1,
+				AccuracyRank: 5,
+				Optional:     true,
+				Notes:        "Highest English accuracy. Larger download.",
 			},
 		},
 	}

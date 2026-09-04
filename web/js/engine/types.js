@@ -2,7 +2,7 @@
  * Shared transcription types.
  */
 
-/** @typedef {{ id: string, label: string, engine: string, path: string, language: string, size_hint_mb: number, notes?: string, default?: boolean }} ModelInfo */
+/** @typedef {{ id: string, label: string, engine: string, path: string, language: string, size_hint_mb: number, notes?: string, default?: boolean, optional?: boolean, multilingual?: boolean, speed_rank?: number, accuracy_rank?: number }} ModelInfo */
 
 /** @typedef {{ text: string, chunks?: Array<{ text: string, timestamp?: [number|null, number|null] }> }} TranscriptResult */
 
@@ -12,6 +12,7 @@
  * @typedef {object} TranscribeOptions
  * @property {string} [language]
  * @property {boolean} [returnTimestamps]
+ * @property {boolean} [translate]
  * @property {number} [threads]
  * @property {(ev: ProgressEvent) => void} [onProgress]
  * @property {(partial: TranscriptResult) => void} [onPartial]

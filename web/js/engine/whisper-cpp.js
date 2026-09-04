@@ -143,9 +143,10 @@ export function createWhisperCppEngine() {
       const withTs = opts.returnTimestamps !== false;
       const threads = clampThreads(opts.threads);
       const lang = opts.language || 'en';
+      const translate = !!opts.translate;
 
       // One full pass is much faster than re-encoding many short windows.
-      const rc = mod.full_default(sharedInstance, pcm, lang, threads, false);
+      const rc = mod.full_default(sharedInstance, pcm, lang, threads, translate);
       if (rc !== 0) {
         partialHandler = null;
         throw new Error('Could not process that audio.');

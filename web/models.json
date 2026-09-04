@@ -22,6 +22,44 @@
       "speed_rank": 3,
       "accuracy_rank": 4,
       "notes": "A bit slower. Catches more detail."
+    },
+    {
+      "id": "tiny-q5_1",
+      "label": "Quick (any language)",
+      "engine": "whisper-cpp",
+      "path": "/models/ggml-tiny-q5_1.bin",
+      "language": "auto",
+      "size_hint_mb": 31,
+      "speed_rank": 5,
+      "accuracy_rank": 2,
+      "optional": true,
+      "multilingual": true,
+      "notes": "Fast multilingual. Use with Translate for English text."
+    },
+    {
+      "id": "base-q5_1",
+      "label": "Clearer (any language)",
+      "engine": "whisper-cpp",
+      "path": "/models/ggml-base-q5_1.bin",
+      "language": "auto",
+      "size_hint_mb": 57,
+      "speed_rank": 3,
+      "accuracy_rank": 4,
+      "optional": true,
+      "multilingual": true,
+      "notes": "Clearer multilingual. Use with Translate for English text."
+    },
+    {
+      "id": "small.en-q5_1",
+      "label": "Best",
+      "engine": "whisper-cpp",
+      "path": "/models/ggml-small.en-q5_1.bin",
+      "language": "en",
+      "size_hint_mb": 182,
+      "speed_rank": 1,
+      "accuracy_rank": 5,
+      "optional": true,
+      "notes": "Highest English accuracy. Larger download."
     }
   ]
 }

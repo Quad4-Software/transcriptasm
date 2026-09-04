@@ -17,9 +17,12 @@ download() {
 	curl -L --fail --retry 5 --retry-delay 2 -o "$dest" "$url"
 }
 
-download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin" \
-	"$MODEL_DIR/ggml-tiny.en-q5_1.bin"
-download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin" \
-	"$MODEL_DIR/ggml-base.en-q5_1.bin"
+BASE="https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
+
+download "$BASE/ggml-tiny.en-q5_1.bin" "$MODEL_DIR/ggml-tiny.en-q5_1.bin"
+download "$BASE/ggml-base.en-q5_1.bin" "$MODEL_DIR/ggml-base.en-q5_1.bin"
+download "$BASE/ggml-tiny-q5_1.bin" "$MODEL_DIR/ggml-tiny-q5_1.bin"
+download "$BASE/ggml-base-q5_1.bin" "$MODEL_DIR/ggml-base-q5_1.bin"
+download "$BASE/ggml-small.en-q5_1.bin" "$MODEL_DIR/ggml-small.en-q5_1.bin"
 
 echo "models ready"
