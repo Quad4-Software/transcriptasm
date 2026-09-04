@@ -203,9 +203,6 @@ async function settle(page) {
     .catch(() => {});
   await page.addStyleTag({
     content: `
-      #btn-install,
-      #btn-ios-tip,
-      #ios-tip-panel,
       #pwa-update-toast { display: none !important; }
     `,
   });

@@ -127,22 +127,6 @@ body {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.ios-tip {
-  position: fixed;
-  top: calc(3.35rem + var(--safe-top));
-  right: calc(0.65rem + var(--safe-right));
-  z-index: 6;
-  max-width: min(16rem, calc(100vw - 1.5rem - var(--safe-left) - var(--safe-right)));
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-  line-height: 1.4;
-  border-radius: var(--radius);
-  box-shadow: 0 12px 28px color-mix(in srgb, black 35%, transparent);
-}
-
 .drop-overlay {
   position: fixed;
   inset: 0;
@@ -894,13 +878,6 @@ body {
     padding: 0.45rem 0.5rem;
     min-height: 2.4rem;
     letter-spacing: 0.03em;
-  }
-
-  .ios-tip {
-    top: calc(var(--chrome-h) + 0.55rem + var(--safe-top));
-    right: calc(0.5rem + var(--safe-right));
-    left: calc(0.5rem + var(--safe-left));
-    max-width: none;
   }
 
   .brand-block {

@@ -8,7 +8,7 @@ import { createEnergyVad } from '../audio/vad.js';
 import { TARGET_SAMPLE_RATE } from '../engine/types.js';
 import { toTxt, toSrt, toVtt, toJson } from '../export/formats.js';
 import { createWaveController } from './wave.js';
-import { cacheModelUrls, setupInstallAffordance } from '../pwa.js';
+import { cacheModelUrls } from '../pwa.js';
 
 registerEngine('whisper-cpp', createWhisperCppEngine);
 registerEngine('whisper-webgpu', createWhisperWebGPUEngine);
@@ -27,9 +27,6 @@ export async function bootApp() {
     btnExport: /** @type {HTMLButtonElement} */ (document.getElementById('btn-export')),
     exportMenu: /** @type {HTMLElement} */ (document.getElementById('export-menu')),
     btnClear: /** @type {HTMLButtonElement} */ (document.getElementById('btn-clear')),
-    btnInstall: /** @type {HTMLButtonElement} */ (document.getElementById('btn-install')),
-    btnIosTip: /** @type {HTMLButtonElement} */ (document.getElementById('btn-ios-tip')),
-    iosTipPanel: /** @type {HTMLElement} */ (document.getElementById('ios-tip-panel')),
     file: /** @type {HTMLInputElement} */ (document.getElementById('file')),
     status: /** @type {HTMLElement} */ (document.getElementById('status')),
     spinner: /** @type {HTMLElement} */ (document.getElementById('spinner')),
@@ -48,11 +45,6 @@ export async function bootApp() {
 
   const wave = createWaveController(els.wave);
   wave.start();
-  setupInstallAffordance({
-    installBtn: els.btnInstall,
-    iosTipBtn: els.btnIosTip,
-    iosTipPanel: els.iosTipPanel,
-  });
 
   /** @type {import('../engine/types.js').ModelInfo[]} */
   let models = [];
@@ -162,7 +154,6 @@ export async function bootApp() {
   window.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') {
       closeExportMenu();
-      els.iosTipPanel.hidden = true;
     }
   });
   els.btnClear.addEventListener('click', () => clearTranscript());

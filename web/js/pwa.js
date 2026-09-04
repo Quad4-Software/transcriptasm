@@ -23,57 +23,6 @@ export async function registerPWA() {
 }
 
 /**
- * @param {{
- *   installBtn: HTMLButtonElement,
- *   iosTipBtn: HTMLButtonElement,
- *   iosTipPanel: HTMLElement,
- * }} els
- */
-export function setupInstallAffordance(els) {
-  const standalone =
-    window.matchMedia('(display-mode: standalone)').matches ||
-    /** @type {any} */ (navigator).standalone === true;
-
-  if (standalone) {
-    els.installBtn.hidden = true;
-    els.iosTipBtn.hidden = true;
-    els.iosTipPanel.hidden = true;
-    return;
-  }
-
-  /** @type {any} */
-  let deferred = null;
-  window.addEventListener('beforeinstallprompt', (ev) => {
-    ev.preventDefault();
-    deferred = ev;
-    els.installBtn.hidden = false;
-  });
-
-  els.installBtn.addEventListener('click', async () => {
-    if (!deferred) {
-      return;
-    }
-    els.installBtn.hidden = true;
-    deferred.prompt();
-    try {
-      await deferred.userChoice;
-    } catch {
-      /* ignore */
-    }
-    deferred = null;
-  });
-
-  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isSafari = /safari/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
-  if (isIos && isSafari) {
-    els.iosTipBtn.hidden = false;
-    els.iosTipBtn.addEventListener('click', () => {
-      els.iosTipPanel.hidden = !els.iosTipPanel.hidden;
-    });
-  }
-}
-
-/**
  * Ask the service worker to cache model URLs in the asset cache.
  * @param {string[]} urls
  * @param {(done: number, total: number) => void} [onProgress]
