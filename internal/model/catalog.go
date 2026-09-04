@@ -63,9 +63,9 @@ func DefaultCatalog() Catalog {
 
 // ByID returns a model or false when unknown.
 func (c Catalog) ByID(id string) (Model, bool) {
-	for _, m := range c.Models {
-		if m.ID == id {
-			return m, true
+	for i := range c.Models {
+		if c.Models[i].ID == id {
+			return c.Models[i], true
 		}
 	}
 	return Model{}, false
@@ -73,9 +73,9 @@ func (c Catalog) ByID(id string) (Model, bool) {
 
 // DefaultModel returns the catalog default or the first entry.
 func (c Catalog) DefaultModel() (Model, bool) {
-	for _, m := range c.Models {
-		if m.Default {
-			return m, true
+	for i := range c.Models {
+		if c.Models[i].Default {
+			return c.Models[i], true
 		}
 	}
 	if len(c.Models) == 0 {
@@ -87,8 +87,8 @@ func (c Catalog) DefaultModel() (Model, bool) {
 // IDs returns model identifiers in catalog order.
 func (c Catalog) IDs() []string {
 	ids := make([]string, 0, len(c.Models))
-	for _, m := range c.Models {
-		ids = append(ids, m.ID)
+	for i := range c.Models {
+		ids = append(ids, c.Models[i].ID)
 	}
 	return slices.Clone(ids)
 }
