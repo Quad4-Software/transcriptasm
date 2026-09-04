@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>transcriptasm | offline speech to text in your browser</title>
   <meta name="description" content="Offline speech-to-text in the browser via Whisper WASM. Talk or drop a clip. Nothing is uploaded.">
   <meta name="keywords" content="speech to text, transcription, whisper, wasm, offline, privacy, browser">
@@ -70,7 +70,7 @@
 <body>
   <div class="chrome-top">
     <button type="button" id="btn-install" class="chrome-link" hidden>Install</button>
-    <button type="button" id="btn-ios-tip" class="chrome-link" hidden>Add to Home Screen</button>
+    <button type="button" id="btn-ios-tip" class="chrome-link" hidden>Home Screen</button>
     <a class="chrome-link" href="https://github.com/Quad4-Software/transcriptasm" rel="noopener noreferrer" target="_blank">Source</a>
   </div>
   <div id="ios-tip-panel" class="ios-tip" hidden>
@@ -84,7 +84,7 @@
     <header class="brand-block">
       <p class="brand">transcriptasm</p>
       <h1 class="headline">Offline speech to text.</h1>
-      <p class="lede">Talk, drop, or paste a clip. It runs in this browser. Nothing is uploaded.</p>
+      <p class="lede">Talk or pick a clip. It runs in this browser. Nothing is uploaded.</p>
     </header>
 
     <div class="workspace">
@@ -122,7 +122,10 @@
               <span class="rec-timer" id="rec-timer" hidden>0:00</span>
             </button>
             <label class="cta secondary file-cta">
-              Upload a file
+              <svg class="file-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2 4 4h-4zM8 13h8v2H8zm0 4h8v2H8zm0-8h5v2H8z"/>
+              </svg>
+              <span>Upload</span>
               <input type="file" id="file" accept="audio/*,video/*,.wav,.wave,.mp3,.ogg,.oga,.opus,.flac,.m4a,.aac,.webm,.mp4,.m4v,.mkv,.mov,.avi,.mpeg,.mpg,.3gp" hidden>
             </label>
           </div>
@@ -143,9 +146,9 @@
         <div class="result-toolbar">
           <h2>Transcript</h2>
           <div class="result-actions">
-            <button type="button" id="btn-copy" class="linkish" disabled>Copy</button>
+            <button type="button" id="btn-copy" class="action-btn" disabled>Copy</button>
             <div class="export-wrap">
-              <button type="button" id="btn-export" class="linkish" disabled aria-haspopup="menu" aria-expanded="false">Export</button>
+              <button type="button" id="btn-export" class="action-btn" disabled aria-haspopup="menu" aria-expanded="false">Export</button>
               <div id="export-menu" class="export-menu" role="menu" hidden>
                 <button type="button" role="menuitem" data-format="txt">TXT</button>
                 <button type="button" role="menuitem" data-format="srt">SRT</button>
@@ -153,7 +156,7 @@
                 <button type="button" role="menuitem" data-format="json">JSON</button>
               </div>
             </div>
-            <button type="button" id="btn-clear" class="linkish" disabled>Clear</button>
+            <button type="button" id="btn-clear" class="action-btn action-btn-muted" disabled>Clear</button>
           </div>
         </div>
         <div id="transcript" class="transcript" tabindex="0" aria-live="polite"></div>
@@ -164,6 +167,7 @@
   <footer class="site-foot">
     <a href="https://github.com/Quad4-Software/transcriptasm/blob/master/LICENSE" rel="noopener noreferrer" target="_blank">0BSD</a>
     <a href="https://github.com/Quad4-Software" rel="noopener noreferrer" target="_blank">Quad4</a>
+    <span id="app-version" class="site-version" hidden></span>
   </footer>
   <script type="module" src="/js/main.js"></script>
 </body>

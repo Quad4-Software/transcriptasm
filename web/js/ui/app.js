@@ -113,6 +113,8 @@ export async function bootApp() {
     void playFrom(start, Number.isFinite(end) ? end : null, row);
   });
 
+  void loadAppVersion();
+
   setBusy(true, 'Getting ready...');
   try {
     models = await loadModels();
@@ -356,7 +358,7 @@ export async function bootApp() {
           liveVad?.push(frame);
         },
       });
-      setStatus('Listening... press Space or Stop when done');
+      setStatus(listeningHint());
       setLive(true);
       wave.setMode('recording');
       wave.setRecording(true);
@@ -767,6 +769,13 @@ export async function bootApp() {
     els.status.textContent = text;
   }
 
+  function listeningHint() {
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    return coarse
+      ? 'Listening... tap Stop when done'
+      : 'Listening... press Space or Stop when done';
+  }
+
   /**
    * @param {number} pct
    */
@@ -1136,6 +1145,28 @@ function appendModelOptions(parent, models) {
       opt.selected = true;
     }
     parent.appendChild(opt);
+  }
+}
+
+/**
+ * Show build version from the Go API when available.
+ * @returns {Promise<void>}
+ */
+async function loadAppVersion() {
+  const el = document.getElementById('app-version');
+  if (!(el instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    const data = await fetchJSON('/api/version');
+    const ver = data && typeof data.version === 'string' ? data.version.trim() : '';
+    if (!ver) {
+      return;
+    }
+    el.textContent = `v${ver}`;
+    el.hidden = false;
+  } catch {
+    // Static hosts without the API omit the label.
   }
 }
 
