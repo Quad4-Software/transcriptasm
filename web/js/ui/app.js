@@ -508,7 +508,7 @@ function fillModels(select, models) {
  * @returns {Promise<import('../engine/types.js').ModelInfo[]>}
  */
 async function loadModels() {
-  const urls = ['/api/models', '/models.json'];
+  const urls = ['/models.json', '/api/models'];
   let lastErr = /** @type {unknown} */ (null);
   for (const url of urls) {
     try {
