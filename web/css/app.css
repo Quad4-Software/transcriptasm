@@ -75,6 +75,51 @@ body {
   padding: clamp(2rem, 6vh, 4rem) 0 3.5rem;
 }
 
+.source-link {
+  position: fixed;
+  top: 1rem;
+  right: 1.15rem;
+  z-index: 5;
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.source-link:hover,
+.source-link:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+.site-foot {
+  position: fixed;
+  right: 1.15rem;
+  bottom: 0.85rem;
+  z-index: 5;
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.site-foot a {
+  color: color-mix(in srgb, var(--ink-soft) 72%, transparent);
+  text-decoration: none;
+}
+
+.site-foot a:hover,
+.site-foot a:focus-visible {
+  color: var(--ink-soft);
+  outline: none;
+}
+
 .brand-block {
   max-width: 40rem;
   margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
@@ -564,6 +609,16 @@ body {
 }
 
 @media (max-width: 900px) {
+  .source-link {
+    top: 0.75rem;
+    right: 0.85rem;
+  }
+
+  .site-foot {
+    right: 0.85rem;
+    bottom: 0.65rem;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
     min-height: 0;
