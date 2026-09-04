@@ -66,22 +66,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background:
-    radial-gradient(900px 600px at 12% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
-    radial-gradient(800px 520px at 90% 0%, color-mix(in srgb, #4a5568 28%, transparent), transparent 50%),
-    linear-gradient(180deg, #101012 0%, var(--paper) 45%, #070708 100%);
-  animation: drift 22s var(--ease) infinite alternate;
-}
-
-@keyframes drift {
-  from {
-    filter: saturate(1);
-    transform: scale(1);
-  }
-  to {
-    filter: saturate(1.06);
-    transform: scale(1.02);
-  }
+  background: linear-gradient(180deg, #101012 0%, var(--paper) 45%, #070708 100%);
 }
 
 .stage {
@@ -530,7 +515,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .atmosphere,
   .brand-block,
   .hero-visual,
   .controls,
