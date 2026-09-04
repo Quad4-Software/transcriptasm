@@ -1,9 +1,10 @@
 /* transcriptasm service worker: offline shell, COOP/COEP isolation, auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.3.0';
+const CACHE_VERSION = 'transcriptasm-v0.3.1';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
-const PRECACHE = [
+/** Required for shell + WASM. Missing any of these fails install. */
+const PRECACHE_REQUIRED = [
   '/',
   '/index.html',
   '/favicon.ico',
@@ -40,6 +41,10 @@ const PRECACHE = [
   '/fonts/fraunces-600.woff2',
   '/vendor/whisper/main.js',
   '/vendor/whisper/main.wasm',
+];
+
+/** WebGPU extras. Skip quietly when not shipped (e.g. before Pages fetch). */
+const PRECACHE_OPTIONAL = [
   '/vendor/transformers/transformers.min.js',
   '/vendor/transformers/ort-wasm-simd-threaded.jsep.mjs',
   '/vendor/transformers/ort-wasm-simd-threaded.jsep.wasm',
@@ -49,7 +54,19 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(SHELL_CACHE);
-      await cache.addAll(PRECACHE);
+      await cache.addAll(PRECACHE_REQUIRED);
+      await Promise.all(
+        PRECACHE_OPTIONAL.map(async (url) => {
+          try {
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (res.ok) {
+              await cache.put(url, res.clone());
+            }
+          } catch {
+            /* optional */
+          }
+        }),
+      );
       await self.skipWaiting();
     })(),
   );
@@ -95,11 +112,15 @@ async function cacheUrls(urls, port) {
     const list = urls.filter((u) => typeof u === 'string' && u.startsWith('/'));
     for (let i = 0; i < list.length; i++) {
       const url = list[i];
-      const res = await fetch(url, { credentials: 'same-origin' });
-      if (!res.ok) {
-        throw new Error(`Could not fetch ${url}`);
+      try {
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) {
+          continue;
+        }
+        await cache.put(url, res.clone());
+      } catch {
+        continue;
       }
-      await cache.put(url, res.clone());
       port && port.postMessage({ type: 'CACHE_PROGRESS', done: i + 1, total: list.length });
     }
     port && port.postMessage({ type: 'CACHE_DONE' });

@@ -34,7 +34,22 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Fetch models
-        run: bash scripts/fetch-models.sh
+        run: |
+          bash scripts/fetch-models.sh
+          bash scripts/fetch-transformers.sh
+          # Quick WebGPU weights only (Pages size). WASM covers the rest.
+          bash -c '
+            set -euo pipefail
+            id=whisper-tiny.en
+            OUT=web/models/onnx/$id
+            HF=https://huggingface.co/onnx-community/$id/resolve/main
+            mkdir -p "$OUT/onnx"
+            for f in config.json tokenizer.json tokenizer_config.json preprocessor_config.json generation_config.json special_tokens_map.json added_tokens.json normalizer.json; do
+              curl -L --fail --retry 3 -o "$OUT/$f" "$HF/$f" || rm -f "$OUT/$f"
+            done
+            curl -L --fail --retry 5 -o "$OUT/onnx/encoder_model.onnx" "$HF/onnx/encoder_model.onnx"
+            curl -L --fail --retry 5 -o "$OUT/onnx/decoder_model_merged_q4.onnx" "$HF/onnx/decoder_model_merged_q4.onnx"
+          '
 
       - name: Configure Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
