@@ -59,6 +59,9 @@ export function createWaveController(canvas) {
    */
   function setRecording(on) {
     mode = on ? 'recording' : mode === 'recording' ? 'idle' : mode;
+    if (!on) {
+      live = null;
+    }
   }
 
   /**
@@ -66,6 +69,9 @@ export function createWaveController(canvas) {
    */
   function setMode(next) {
     mode = next === 'recording' || next === 'transcribing' ? next : 'idle';
+    if (mode !== 'recording') {
+      live = null;
+    }
   }
 
   function draw() {
@@ -79,10 +85,11 @@ export function createWaveController(canvas) {
     ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
 
-    drawCurve(colors.ink, phase, 1, mid, w, h);
-    drawCurve(colors.accent, phase * 1.35 + 1.2, 0.72, mid, w, h);
+    const amp = mode === 'transcribing' ? 1.15 : 1;
+    drawCurve(colors.ink, phase, amp, mid, w, h);
+    drawCurve(colors.accent, phase * 1.35 + 1.2, amp * 0.72, mid, w, h);
 
-    if (live && live.length > 0) {
+    if (mode === 'recording' && live && live.length > 0) {
       ctx.beginPath();
       ctx.strokeStyle = colors.live;
       ctx.lineWidth = 2;
@@ -99,40 +106,13 @@ export function createWaveController(canvas) {
       }
       ctx.stroke();
     } else if (mode === 'transcribing') {
-      drawBusyBars(colors.live, phase, mid, w, h);
+      drawCurve(colors.live, phase * 1.8 + 0.4, 1.05, mid, w, h);
     }
 
     if (!reduced) {
       phase += colors.speed;
       raf = requestAnimationFrame(draw);
     }
-  }
-
-  /**
-   * Soft traveling bars while transcribing without mic input.
-   * @param {string} color
-   * @param {number} p
-   * @param {number} mid
-   * @param {number} w
-   * @param {number} h
-   */
-  function drawBusyBars(color, p, mid, w, h) {
-    const bars = Math.max(24, Math.floor(w / 18));
-    const gap = w / bars;
-    ctx.fillStyle = color;
-    for (let i = 0; i < bars; i++) {
-      const t = i / bars;
-      const amp =
-        0.2 +
-        0.55 * Math.abs(Math.sin(t * Math.PI * 3 + p * 1.8)) +
-        0.25 * Math.abs(Math.sin(t * Math.PI * 7 + p));
-      const bh = h * 0.18 * amp;
-      const x = i * gap + gap * 0.25;
-      const bw = Math.max(2, gap * 0.45);
-      ctx.globalAlpha = 0.55 + amp * 0.35;
-      ctx.fillRect(x, mid - bh, bw, bh * 2);
-    }
-    ctx.globalAlpha = 1;
   }
 
   /**
