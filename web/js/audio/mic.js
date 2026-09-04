@@ -26,13 +26,21 @@ export class MicRecorder {
     this.pcm = new GrowablePCM(TARGET_SAMPLE_RATE * 16);
     /** @type {Uint8Array} */
     this.waveScratch = new Uint8Array(2048);
+    /** @type {((frame: Float32Array) => void) | null} */
+    this.onFrame = null;
+    /** @type {Float32Array | null} */
+    this.frameScratch = null;
   }
 
-  /** @returns {Promise<void>} */
-  async start() {
+  /**
+   * @param {{ onFrame?: (frame16k: Float32Array) => void }} [opts]
+   * @returns {Promise<void>}
+   */
+  async start(opts = {}) {
     this.cleanup();
     this.pcm.reset();
     this.chunks = [];
+    this.onFrame = opts.onFrame || null;
 
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -57,13 +65,17 @@ export class MicRecorder {
       this.processor.onaudioprocess = (ev) => {
         const input = ev.inputBuffer.getChannelData(0);
         this.pcm.push(input);
+        if (this.onFrame) {
+          const rate = this.audioCtx ? this.audioCtx.sampleRate : TARGET_SAMPLE_RATE;
+          const frame = resampleLinear(input, rate, TARGET_SAMPLE_RATE, this.frameScratch || undefined);
+          if (frame.length && (!this.frameScratch || this.frameScratch.length !== frame.length)) {
+            this.frameScratch = frame;
+          }
+          this.onFrame(frame);
+        }
       };
-      this.source.connect(this.processor);
-      this.processor.connect(this.audioCtx.destination);
-      // Mute monitoring path
       const gain = this.audioCtx.createGain();
       gain.gain.value = 0;
-      this.processor.disconnect();
       this.source.connect(this.processor);
       this.processor.connect(gain);
       gain.connect(this.audioCtx.destination);
@@ -124,6 +136,7 @@ export class MicRecorder {
   }
 
   cleanup() {
+    this.onFrame = null;
     if (this.processor) {
       try {
         this.processor.onaudioprocess = null;
