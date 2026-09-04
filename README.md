@@ -39,4 +39,4 @@ Binary: `bin/transcriptasm` (default listen `:8080`, web root `web`).
 
 ## License
 
-MIT
+0BSD
