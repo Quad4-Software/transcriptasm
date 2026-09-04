@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="transcriptasm turns speech into text right in your browser">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="transcriptasm">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <title>transcriptasm</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+  <main class="stage">
+    <header class="brand-block">
+      <p class="brand">transcriptasm</p>
+      <h1 class="headline">Your words, written down.</h1>
+      <p class="lede">Talk or drop a clip. It runs in this browser. Nothing is uploaded.</p>
+    </header>
+
+    <section class="hero-visual" aria-hidden="true">
+      <canvas id="wave" width="1200" height="280"></canvas>
+    </section>
+
+    <section class="controls" aria-label="Controls">
+      <div class="control-row">
+        <label class="field">
+          <span>Voice style</span>
+          <select id="model"></select>
+        </label>
+        <label class="toggle" for="timestamps">
+          <input type="checkbox" id="timestamps" checked>
+          <span class="toggle-ui" aria-hidden="true"></span>
+          <span class="toggle-label">Show times</span>
+        </label>
+      </div>
+
+      <div class="cta-row">
+        <button type="button" id="btn-mic" class="cta record" aria-pressed="false">
+          <span class="rec-dot" aria-hidden="true"></span>
+          <span class="rec-label">Record</span>
+          <span class="rec-timer" id="rec-timer" hidden>0:00</span>
+        </button>
+        <label class="cta secondary file-cta">
+          Upload a file
+          <input type="file" id="file" accept="audio/*,video/*,.wav,.mp3,.ogg,.m4a,.webm,.flac,.mp4,.mkv,.mov" hidden>
+        </label>
+      </div>
+
+      <div class="status-row">
+        <span id="live-pill" class="live-pill" aria-hidden="true">Live</span>
+        <span id="spinner" class="spinner" hidden aria-hidden="true"></span>
+        <p id="status" class="status" role="status">Getting ready...</p>
+      </div>
+      <div class="progress-track" hidden>
+        <div id="progress" class="progress-bar"></div>
+      </div>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+
+    <section class="result" aria-label="Transcript">
+      <div class="result-toolbar">
+        <h2>Your transcript</h2>
+        <div class="result-actions">
+          <button type="button" id="btn-copy" class="linkish" disabled>Copy</button>
+          <button type="button" id="btn-download" class="linkish" disabled>Download</button>
+          <button type="button" id="btn-clear" class="linkish" disabled>Clear</button>
+        </div>
+      </div>
+      <div id="transcript" class="transcript" tabindex="0" aria-live="polite"></div>
+      <p id="meta" class="meta" hidden></p>
+    </section>
+  </main>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
