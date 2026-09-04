@@ -1,5 +1,5 @@
 /* transcriptasm service worker: offline shell, COOP/COEP isolation, auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.3.2';
+const CACHE_VERSION = 'transcriptasm-v0.3.3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 

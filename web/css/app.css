@@ -234,7 +234,7 @@ body {
 
 .site-foot a,
 .site-foot .site-version {
-  color: color-mix(in srgb, var(--ink-soft) 72%, transparent);
+  color: var(--ink-soft);
   text-decoration: none;
   padding: 0.45rem 0.55rem;
   min-height: 2.25rem;
@@ -246,7 +246,7 @@ body {
 
 .site-foot a:hover,
 .site-foot a:focus-visible {
-  color: var(--ink-soft);
+  color: var(--ink);
   outline: none;
 }
 
