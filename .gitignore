@@ -8,5 +8,4 @@ dist/
 .vscode/
 coverage.out
 coverage.html
-whisper-wasm/
 web/models/*.bin

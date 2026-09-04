@@ -21,7 +21,6 @@ if [[ ! -d "$WORKDIR/.git" ]]; then
   git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git "$WORKDIR"
 fi
 
-# Prefer project-maintained binding if present.
 BIND_SRC="$ROOT/third_party/whisper-wasm/emscripten.cpp"
 if [[ -f "$BIND_SRC" ]]; then
   cp -f "$BIND_SRC" "$WORKDIR/examples/whisper.wasm/emscripten.cpp"
@@ -31,10 +30,16 @@ if [[ -f "$CMAKE_SRC" ]]; then
   cp -f "$CMAKE_SRC" "$WORKDIR/examples/whisper.wasm/CMakeLists.txt"
 fi
 
-BUILD="$WORKDIR/build-em"
+BUILD="$WORKDIR/build-em-fast"
 mkdir -p "$BUILD" "$OUT"
 cd "$BUILD"
-emcmake cmake .. -DWHISPER_WASM_SINGLE_FILE=OFF -DGGML_NATIVE=OFF
+emcmake cmake .. \
+  -DWHISPER_WASM_SINGLE_FILE=OFF \
+  -DGGML_NATIVE=OFF \
+  -DGGML_OPENMP=OFF \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_FLAGS="-O3 -msimd128" \
+  -DCMAKE_CXX_FLAGS="-O3 -msimd128"
 cmake --build . --target libmain -j"$(nproc 2>/dev/null || echo 2)"
 
 cp -f "$BUILD/bin/libmain.js" "$OUT/main.js"
