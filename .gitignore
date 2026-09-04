@@ -15,3 +15,5 @@ web/vendor/transformers/
 web/samples/
 scripts/screenshot/node_modules/
 docs/screenshots/server.log
+.build/
+web/build/

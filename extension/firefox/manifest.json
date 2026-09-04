@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "transcriptasm",
+  "version": "0.1.0",
+  "description": "Offline speech-to-text via on-device Whisper. Record from the extension bridge tab.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "transcriptasm",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "contextMenus",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://transcriptasm.quad4.io/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://transcriptasm.quad4.io/*",
+      "http://127.0.0.1/*",
+      "http://localhost/*"
+    ]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors 'none';"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "transcriptasm@quad4.io",
+      "strict_min_version": "121.0"
+    }
+  }
+}
