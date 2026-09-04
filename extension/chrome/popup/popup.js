@@ -12,14 +12,15 @@ function setBusy(on) {
 async function send(msg) { return chrome.runtime.sendMessage(msg); }
 
 const settings = await send({ type: "get-settings" });
-if (settings?.bridgeOrigin) $("bridge").value = settings.bridgeOrigin;
+if (settings?.updateAvailable && settings?.remoteVersion) {
+  setStatus(`Update ${settings.remoteVersion} available in Settings`);
+}
 
 async function persist() {
   await send({
     type: "save-settings",
     settings: {
       modelId: $("model").value || undefined,
-      bridgeOrigin: $("bridge").value.trim() || undefined,
     },
   });
 }
@@ -104,4 +105,9 @@ $("btn-copy").addEventListener("click", async () => {
 $("btn-open").addEventListener("click", async () => {
   await send({ type: "open-app" });
   window.close();
+});
+
+
+$("btn-settings").addEventListener("click", async () => {
+  await send({ type: "open-options" });
 });

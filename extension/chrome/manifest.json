@@ -26,7 +26,9 @@
     "activeTab",
     "scripting",
     "contextMenus",
-    "tabs"
+    "tabs",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://transcriptasm.quad4.io/*",
@@ -46,5 +48,10 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors 'none';"
-  }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "update_url": "https://transcriptasm.quad4.io/build/updates.xml"
 }

@@ -28,7 +28,9 @@
     "activeTab",
     "scripting",
     "contextMenus",
-    "tabs"
+    "tabs",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://transcriptasm.quad4.io/*",
@@ -52,7 +54,12 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "transcriptasm@quad4.io",
-      "strict_min_version": "121.0"
+      "strict_min_version": "121.0",
+      "update_url": "https://transcriptasm.quad4.io/build/updates.json"
     }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
   }
 }
