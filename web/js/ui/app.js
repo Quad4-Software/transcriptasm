@@ -186,6 +186,7 @@ export async function bootApp() {
       mic = new MicRecorder();
       await mic.start();
       setStatus('Listening... press Space or Stop when done');
+      wave.setMode('recording');
       wave.setRecording(true);
       recordStartedAt = Date.now();
       els.recTimer.hidden = false;
@@ -199,6 +200,7 @@ export async function bootApp() {
       setRecordingUI(false);
       setControls(false);
       wave.setRecording(false);
+      wave.setMode('idle');
       setStatus('Could not reach the mic.');
       showError(friendlyError(err));
       cleanupMic();
@@ -219,6 +221,7 @@ export async function bootApp() {
       recording = false;
       setRecordingUI(false);
       wave.setRecording(false);
+      wave.setMode('transcribing');
       await runTranscription(pcm);
     } catch (err) {
       setStatus('That recording did not work.');
@@ -228,6 +231,7 @@ export async function bootApp() {
       recording = false;
       setRecordingUI(false);
       wave.setRecording(false);
+      wave.setMode('idle');
       setControls(false);
       setLoading(false);
       setLive(false);
@@ -257,11 +261,13 @@ export async function bootApp() {
       }
       setStatus(`Opening ${file.name}...`);
       const pcm = await decodeToWhisperPCM(file);
+      wave.setMode('transcribing');
       await runTranscription(pcm);
     } catch (err) {
       setStatus('Could not read that file.');
       showError(friendlyError(err));
     } finally {
+      wave.setMode('idle');
       setControls(false);
       setLoading(false);
       setLive(false);
@@ -286,6 +292,7 @@ export async function bootApp() {
     const t0 = performance.now();
     lastPCM = pcm;
     stopPlayback();
+    wave.setMode('transcribing');
     setStatus('Transcribing...');
     setLive(true);
     showProgress(8);
@@ -312,6 +319,7 @@ export async function bootApp() {
     els.transcript.classList.remove('is-live');
     setLive(false);
     hideProgress();
+    wave.setMode('idle');
     const ms = Math.round(performance.now() - t0);
     const rtf = seconds > 0 ? (ms / 1000 / seconds) : 0;
     els.meta.hidden = false;
