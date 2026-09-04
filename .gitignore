@@ -13,3 +13,5 @@ web/models/*.bin
 web/models/onnx/
 web/vendor/transformers/
 web/samples/
+scripts/screenshot/node_modules/
+docs/screenshots/server.log
