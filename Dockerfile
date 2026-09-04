@@ -101,7 +101,11 @@ COPY --from=models --chown=nonroot:nonroot /models/ /app/web/models/
 COPY --from=models --chown=nonroot:nonroot /onnx-models/ /app/web/models/onnx/
 COPY --from=models --chown=nonroot:nonroot /transformers/ /app/web/vendor/transformers/
 
-RUN chmod 0555 /app/transcriptasm \
+RUN test -f /app/web/vendor/whisper/main.js \
+	&& test -f /app/web/vendor/whisper/main.wasm \
+	&& test -f /app/web/models/ggml-tiny.en-q5_1.bin \
+	&& test -f /app/web/vendor/transformers/transformers.min.js \
+	&& chmod 0555 /app/transcriptasm \
 	&& chmod -R a-w /app/web
 
 ENV TRANSCRIPTASM_ADDR=":8080" \

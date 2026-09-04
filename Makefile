@@ -1,14 +1,18 @@
-# transcriptasm offline browser Whisper via single-file WASM
+# transcriptasm offline browser Whisper via WASM
 #
 # Targets:
-#   make assets      download WASM + models + fonts (once)
+#   make assets      download models + fonts + transformers + onnx (once)
 #   make build       compile server
 #   make run         run on :8080
+#   make docker      build local container image (full offline assets)
+#   make docker-push buildx push to GHCR (linux/amd64,linux/arm64)
+#   make badges      regenerate themed shields.io endpoint JSON
 #   make test        go + js tests
 #   make bench       go audio benchmarks
 #   make lint        golangci-lint
 #   make sec         gosec + govulncheck
 #   make check       test + lint + sec
+#   make screenshots capture docs/screenshots via Playwright
 
 APP        := transcriptasm
 MODULE     := github.com/Quad4-Software/transcriptasm
@@ -19,6 +23,8 @@ GO         ?= go
 GOFLAGS    ?=
 LDFLAGS    ?= -s -w -X $(MODULE)/internal/version.Version=$(VERSION)
 VERSION    ?= 0.1.0
+IMAGE      ?= ghcr.io/quad4-software/$(APP):$(VERSION)
+PLATFORMS  ?= linux/amd64,linux/arm64
 
 GOLANGCI_LINT ?= golangci-lint
 GOSEC         ?= gosec
@@ -27,20 +33,24 @@ STATICCHECK   ?= staticcheck
 GOIMPORTS     ?= goimports
 NODE          ?= node
 
-.PHONY: all assets build run test test-go test-js bench lint sec check fmt vet staticcheck clean whisper-wasm help
+.PHONY: all assets build run docker docker-push badges test test-go test-js bench lint sec check fmt vet staticcheck screenshots clean whisper-wasm help
 
 all: assets build
 
 help:
 	@printf '%s\n' \
-		'assets        fetch offline WASM/models/fonts/transformers/onnx' \
+		'assets        fetch offline models/fonts/transformers/onnx' \
 		'build         compile $(BIN)' \
 		'run           ensure assets then serve :8080' \
+		'docker        build $(IMAGE) with full offline assets' \
+		'docker-push   buildx push $(IMAGE) for $(PLATFORMS)' \
+		'badges        regenerate themed shields endpoint JSON' \
 		'test          go test + node tests' \
 		'bench         go test -bench audio' \
 		'lint          golangci-lint run' \
 		'sec           gosec + govulncheck' \
 		'check         test + lint + sec' \
+		'screenshots   Playwright capture into docs/screenshots' \
 		'clean         remove bin/'
 
 assets:
@@ -57,6 +67,29 @@ build: $(BIN_DIR)
 
 run: assets build
 	$(BIN) -web web -addr :8080
+
+docker:
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg REVISION=$$(git rev-parse HEAD 2>/dev/null || echo local) \
+		--build-arg CREATED=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+		-t $(IMAGE) \
+		-t $(APP):$(VERSION) \
+		.
+
+docker-push:
+	docker buildx build \
+		--platform $(PLATFORMS) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg REVISION=$$(git rev-parse HEAD 2>/dev/null || echo local) \
+		--build-arg CREATED=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+		-t $(IMAGE) \
+		-t ghcr.io/quad4-software/$(APP):latest \
+		--push \
+		.
+
+badges:
+	@VERSION=$(VERSION) bash scripts/gen-badges.sh
 
 test-go:
 	$(GO) test $(GOFLAGS) ./...
@@ -89,6 +122,9 @@ sec:
 	$(GOVULNCHECK) ./...
 
 check: test vet lint sec
+
+screenshots: build
+	@bash scripts/screenshot.sh
 
 clean:
 	rm -rf $(BIN_DIR)

@@ -5,19 +5,19 @@ name: transcriptasm
 
 services:
   transcriptasm:
+    image: ${IMAGE:-ghcr.io/quad4-software/transcriptasm:${VERSION:-0.1.0}}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        VERSION: "0.1.0"
+        VERSION: "${VERSION:-0.1.0}"
         REVISION: "${REVISION:-local}"
         CREATED: "${CREATED:-unknown}"
-    image: transcriptasm:0.1.0
     container_name: transcriptasm
     restart: unless-stopped
     init: true
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${HOST_PORT:-127.0.0.1:8080}:8080"
     environment:
       TRANSCRIPTASM_ADDR: ${TRANSCRIPTASM_ADDR:-:8080}
       TRANSCRIPTASM_WEB: ${TRANSCRIPTASM_WEB:-/app/web}

@@ -20,7 +20,17 @@ download() {
   curl -L --fail --retry 5 --retry-delay 2 -o "$dest" "$url"
 }
 
-download "https://ggml.ai/whisper.cpp/main.js" "$WHISPER_DIR/main.js"
+# Custom whisper WASM (main.js + main.wasm) is committed under web/vendor/whisper.
+# Rebuild with: make whisper-wasm
+if [[ ! -f "$WHISPER_DIR/main.wasm" || ! -s "$WHISPER_DIR/main.wasm" \
+   || ! -f "$WHISPER_DIR/main.js" || ! -s "$WHISPER_DIR/main.js" ]]; then
+  echo "missing web/vendor/whisper/main.{js,wasm}" >&2
+  echo "run: make whisper-wasm" >&2
+  exit 1
+fi
+echo "present: $WHISPER_DIR/main.js"
+echo "present: $WHISPER_DIR/main.wasm"
+
 download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin" \
   "$MODEL_DIR/ggml-tiny.en-q5_1.bin"
 download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin" \

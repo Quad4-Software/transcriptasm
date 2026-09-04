@@ -10,12 +10,14 @@ bin
 testdata
 third_party
 whisper-wasm
-scripts
+scripts/screenshot
+scripts/build-whisper-wasm.sh
 .golangci.yml
 docker-compose*.yml
-Dockerfile*
 *.tar
 *.zip
 .DS_Store
 agent-transcripts
 web/models/*.bin
+web/models/onnx/
+web/vendor/transformers/
