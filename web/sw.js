@@ -1,5 +1,5 @@
 /* transcriptasm service worker: offline shell + auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.1.2';
+const CACHE_VERSION = 'transcriptasm-v0.1.3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 

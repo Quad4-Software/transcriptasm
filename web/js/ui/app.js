@@ -537,6 +537,18 @@ function isAllowedMediaFile(file) {
   if (mime.startsWith('audio/') || mime.startsWith('video/')) {
     return true;
   }
+  // Some OSes report WAV/MP4 as octet-stream or empty MIME.
+  if (
+    mime === '' ||
+    mime === 'application/octet-stream' ||
+    mime === 'binary/octet-stream'
+  ) {
+    const name = file.name || '';
+    const dot = name.lastIndexOf('.');
+    if (dot >= 0 && MEDIA_EXTENSIONS.has(name.slice(dot).toLowerCase())) {
+      return true;
+    }
+  }
   const name = file.name || '';
   const dot = name.lastIndexOf('.');
   if (dot < 0) {
@@ -567,8 +579,8 @@ function friendlyError(err) {
   if (lower.includes('permission') || lower.includes('notallowed') || lower.includes('denied')) {
     return 'Microphone access was blocked. Allow it in your browser settings, then try again.';
   }
-  if (lower.includes('decode') || lower.includes('wav') || lower.includes('media')) {
-    return 'That file could not be read. Try a common audio or video format.';
+  if (lower.includes('decode') || lower.includes('wav') || lower.includes('media') || lower.includes('encoding')) {
+    return 'That audio could not be decoded. Try a standard WAV, MP3, M4A, or WebM file.';
   }
   if (lower.includes('refresh') || lower.includes('isolated') || lower.includes('cross-origin')) {
     return 'This browser tab needs a refresh to enable local voice processing.';

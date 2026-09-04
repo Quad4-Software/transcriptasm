@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { resampleLinear, toMono } from './resample.js';
 import { GrowablePCM } from './pcm-buffer.js';
+import { decodeWavPCM } from './decode.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 test('resample same rate returns same reference', () => {
   const input = new Float32Array([0, 0.5, 1]);
@@ -30,4 +36,51 @@ test('GrowablePCM grows and take copies', () => {
   const taken = g.take();
   assert.deepEqual([...taken], [1, 2, 3, 4, 5]);
   assert.equal(g.length, 0);
+});
+
+test('decodeWavPCM reads sample jfk wav', () => {
+  const bytes = new Uint8Array(readFileSync(join(root, 'web/samples/jfk.wav')));
+  const pcm = decodeWavPCM(bytes);
+  assert.equal(pcm.length, 176000);
+  assert.ok(pcm.some((v) => v !== 0));
+});
+
+test('decodeWavPCM reads sample with LIST chunk', () => {
+  const bytes = new Uint8Array(readFileSync(join(root, 'web/samples/hello16.wav')));
+  const pcm = decodeWavPCM(bytes);
+  assert.ok(pcm.length > 1000);
+});
+
+test('decodeWavPCM accepts WAVE_FORMAT_EXTENSIBLE PCM', () => {
+  const guid = Buffer.from('0100000000001000800000aa00389b71', 'hex');
+  const fmt = Buffer.alloc(40);
+  fmt.writeUInt16LE(0xfffe, 0);
+  fmt.writeUInt16LE(1, 2);
+  fmt.writeUInt32LE(16000, 4);
+  fmt.writeUInt32LE(32000, 8);
+  fmt.writeUInt16LE(2, 12);
+  fmt.writeUInt16LE(16, 14);
+  fmt.writeUInt16LE(22, 16);
+  fmt.writeUInt16LE(16, 18);
+  fmt.writeUInt32LE(0, 20);
+  guid.copy(fmt, 24);
+  const pcmData = Buffer.alloc(320);
+  for (let i = 0; i < 160; i++) pcmData.writeInt16LE(i * 20, i * 2);
+  const chunks = Buffer.concat([
+    Buffer.from('fmt '),
+    (() => { const b = Buffer.alloc(4); b.writeUInt32LE(fmt.length, 0); return b; })(),
+    fmt,
+    Buffer.from('data'),
+    (() => { const b = Buffer.alloc(4); b.writeUInt32LE(pcmData.length, 0); return b; })(),
+    pcmData,
+  ]);
+  const riff = Buffer.concat([
+    Buffer.from('RIFF'),
+    (() => { const b = Buffer.alloc(4); b.writeUInt32LE(4 + chunks.length, 0); return b; })(),
+    Buffer.from('WAVE'),
+    chunks,
+  ]);
+  const pcm = decodeWavPCM(new Uint8Array(riff));
+  assert.equal(pcm.length, 160);
+  assert.ok(Math.abs(pcm[10]) > 0);
 });
