@@ -11,9 +11,8 @@ export { parseWhisperOutput } from './whisper-parse.js';
 const WASM_DIR = '/vendor/whisper/';
 const WASM_SCRIPT = `${WASM_DIR}main.js`;
 const MODEL_VFS_NAME = 'whisper.bin';
-const SEG_RE = /^\[(\d{2}):(\d{2}):(\d{2}\.\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2}\.\d{3})\]\s*(.*)$/;
-/** Seconds of audio per streaming window for progressive UI updates. */
-const STREAM_WINDOW_SEC = 12;
+/** Minimum ms between UI partial flushes while still streaming. */
+const PARTIAL_MIN_MS = 48;
 
 /** @type {Promise<any> | null} */
 let modulePromise = null;
@@ -59,15 +58,8 @@ function loadModule() {
         }
         return `${WASM_DIR}${name}`;
       },
-      print(text) {
-        handlePrint(String(text));
-      },
-      printErr(text) {
-        const line = String(text);
-        if (line && !line.startsWith('worker')) {
-          handlePrint(line);
-        }
-      },
+      print() {},
+      printErr() {},
       setStatus() {},
       monitorRunDependencies() {},
       onRuntimeInitialized() {
@@ -78,7 +70,7 @@ function loadModule() {
     /** @type {any} */ (window).Module = mod;
 
     const script = document.createElement('script');
-    script.src = `${WASM_SCRIPT}?v=stream-wasm`;
+    script.src = `${WASM_SCRIPT}?v=fast-wasm`;
     script.async = true;
     script.onerror = () => {
       modulePromise = null;
@@ -91,36 +83,7 @@ function loadModule() {
 
 /** @type {((partial: import('./types.js').TranscriptResult) => void) | null} */
 let partialHandler = null;
-
-/**
- * @param {string} line
- */
-function handlePrint(line) {
-  const m = SEG_RE.exec(line);
-  if (!m) {
-    return;
-  }
-  const start = hmsToSec(m[1], m[2], m[3]);
-  const end = hmsToSec(m[4], m[5], m[6]);
-  const text = (m[7] || '').trim();
-  if (!text) {
-    return;
-  }
-  liveChunks.push({ text, timestamp: [start, end] });
-  if (partialHandler) {
-    const joined = liveChunks.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim();
-    partialHandler({ text: joined, chunks: liveChunks.slice() });
-  }
-}
-
-/**
- * @param {string} hh
- * @param {string} mm
- * @param {string} ss
- */
-function hmsToSec(hh, mm, ss) {
-  return Number(hh) * 3600 + Number(mm) * 60 + Number(ss);
-}
+let lastPartialAt = 0;
 
 /**
  * @returns {import('./types.js').Engine}
@@ -173,6 +136,7 @@ export function createWhisperCppEngine() {
       }
 
       liveChunks = [];
+      lastPartialAt = 0;
       partialHandler = opts.onPartial || null;
       opts.onProgress?.({ status: 'transcribing', progress: 0.05 });
 
@@ -180,63 +144,35 @@ export function createWhisperCppEngine() {
       const threads = clampThreads(opts.threads);
       const lang = opts.language || 'en';
 
-      // Process in windows so uploads stream segment-by-segment instead of one
-      // final dump when whisper_full finishes the whole file.
-      const windowSamples = Math.round(STREAM_WINDOW_SEC * TARGET_SAMPLE_RATE);
-      const totalWindows = Math.max(1, Math.ceil(pcm.length / windowSamples));
-      /** @type {Array<{ text: string, timestamp: [number, number] }>} */
-      const collected = [];
-
-      for (let w = 0; w < totalWindows; w++) {
-        const start = w * windowSamples;
-        const end = Math.min(pcm.length, start + windowSamples);
-        const slice = pcm.subarray(start, end);
-        if (slice.length < TARGET_SAMPLE_RATE / 4) {
-          break;
-        }
-        const offsetSec = start / TARGET_SAMPLE_RATE;
-
-        const rc = mod.full_default(sharedInstance, slice, lang, threads, false);
-        if (rc !== 0) {
-          partialHandler = null;
-          throw new Error('Could not process that audio.');
-        }
-
-        await waitUntilIdle(mod, sharedInstance, estimatedTimeoutMs(slice.length), {
-          onTick: () => {
-            const base = (w + 0.15) / totalWindows;
-            opts.onProgress?.({
-              status: 'transcribing',
-              progress: Math.min(0.92, 0.05 + base * 0.9),
-            });
-          },
-          onSegments: () => {
-            const partial = offsetSegments(readSegments(mod, sharedInstance, true), offsetSec);
-            emitPartial(opts, withTs, mergeWindowSegments(collected, partial.chunks || []));
-          },
-        });
-
-        const finalWin = offsetSegments(readSegments(mod, sharedInstance, true), offsetSec);
-        mergeWindowSegments(collected, finalWin.chunks || []);
-        emitPartial(opts, withTs, collected);
-        opts.onProgress?.({
-          status: 'transcribing',
-          progress: Math.min(0.95, 0.05 + ((w + 1) / totalWindows) * 0.9),
-        });
-        await paintFrame();
+      // One full pass is much faster than re-encoding many short windows.
+      const rc = mod.full_default(sharedInstance, pcm, lang, threads, false);
+      if (rc !== 0) {
+        partialHandler = null;
+        throw new Error('Could not process that audio.');
       }
 
-      liveChunks = collected.slice();
-      const result = {
-        text: collected.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim(),
-        chunks: collected.slice(),
-      };
-      if (opts.onPartial) {
-        opts.onPartial(withTs ? result : { text: result.text });
-      }
+      await waitUntilIdle(mod, sharedInstance, estimatedTimeoutMs(pcm.length), {
+        onTick: (segCount) => {
+          opts.onProgress?.({
+            status: 'transcribing',
+            progress: Math.min(0.92, 0.08 + segCount * 0.07),
+          });
+          if (segCount > 0 && typeof mod.get_segment_count === 'function') {
+            const partial = readSegments(mod, sharedInstance, true);
+            liveChunks = toLiveChunks(partial.chunks);
+            flushPartial(false);
+          }
+        },
+      });
+
+      const result = typeof mod.get_segment_count === 'function'
+        ? readSegments(mod, sharedInstance, withTs)
+        : { text: '' };
+      liveChunks = withTs && result.chunks ? toLiveChunks(result.chunks) : [];
+      flushPartial(true);
       partialHandler = null;
       opts.onProgress?.({ status: 'done', progress: 1 });
-      return withTs ? result : { text: result.text };
+      return result;
     },
 
     dispose() {
@@ -255,89 +191,82 @@ export function createWhisperCppEngine() {
 }
 
 /**
- * @param {import('./types.js').TranscriptResult} result
- * @param {number} offsetSec
- * @returns {import('./types.js').TranscriptResult}
+ * @param {Array<{ text: string, timestamp?: [number|null, number|null] }> | undefined} chunks
+ * @returns {Array<{ text: string, timestamp: [number, number] }>}
  */
-function offsetSegments(result, offsetSec) {
-  const chunks = (result.chunks || []).map((c) => {
-    const t0 = c.timestamp && c.timestamp[0] != null ? Number(c.timestamp[0]) + offsetSec : offsetSec;
-    const t1 = c.timestamp && c.timestamp[1] != null ? Number(c.timestamp[1]) + offsetSec : t0;
-    return { text: c.text, timestamp: /** @type {[number, number]} */ ([t0, t1]) };
-  });
-  const text = chunks.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim();
-  return { text, chunks };
-}
-
-/**
- * Append new window segments into the running transcript list.
- * @param {Array<{ text: string, timestamp: [number, number] }>} collected
- * @param {Array<{ text: string, timestamp?: [number|null, number|null] }>} incoming
- */
-function mergeWindowSegments(collected, incoming) {
-  for (const c of incoming) {
+function toLiveChunks(chunks) {
+  if (!chunks || chunks.length === 0) {
+    return [];
+  }
+  /** @type {Array<{ text: string, timestamp: [number, number] }>} */
+  const out = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const c = chunks[i];
     const text = (c.text || '').trim();
     if (!text) {
       continue;
     }
     const t0 = c.timestamp && c.timestamp[0] != null ? Number(c.timestamp[0]) : 0;
     const t1 = c.timestamp && c.timestamp[1] != null ? Number(c.timestamp[1]) : t0;
-    const last = collected[collected.length - 1];
-    if (last && last.text === text && Math.abs(last.timestamp[0] - t0) < 0.35) {
-      last.timestamp[1] = Math.max(last.timestamp[1], t1);
-      continue;
-    }
-    collected.push({ text, timestamp: [t0, t1] });
+    out.push({ text, timestamp: [t0, t1] });
   }
-  return collected;
+  return out;
 }
 
 /**
- * @param {import('./types.js').TranscribeOptions} opts
- * @param {boolean} withTs
- * @param {Array<{ text: string, timestamp: [number, number] }>} chunks
+ * @param {boolean} force
  */
-function emitPartial(opts, withTs, chunks) {
-  liveChunks = chunks.slice();
-  if (!opts.onPartial) {
+function flushPartial(force) {
+  if (!partialHandler) {
     return;
   }
-  const text = chunks.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim();
-  opts.onPartial(withTs ? { text, chunks: chunks.slice() } : { text });
+  const now = performance.now();
+  if (!force && now - lastPartialAt < PARTIAL_MIN_MS) {
+    return;
+  }
+  lastPartialAt = now;
+  const text = joinChunkText(liveChunks);
+  partialHandler({ text, chunks: liveChunks });
 }
 
 /**
- * Poll until the WASM worker finishes. Emit segments as get_segment_count grows
- * so the UI streams instead of waiting for printf flush at the end.
+ * @param {Array<{ text: string }>} chunks
+ */
+function joinChunkText(chunks) {
+  if (chunks.length === 0) {
+    return '';
+  }
+  let out = chunks[0].text;
+  for (let i = 1; i < chunks.length; i++) {
+    out += ' ' + chunks[i].text;
+  }
+  return out;
+}
+
+/**
+ * Poll until the WASM worker finishes.
  * @param {any} mod
  * @param {number} instance
  * @param {number} timeoutMs
- * @param {{ onTick?: (segCount: number) => void, onSegments?: () => void }} [hooks]
+ * @param {{ onTick?: (segCount: number) => void }} [hooks]
  */
 async function waitUntilIdle(mod, instance, timeoutMs, hooks = {}) {
   const start = Date.now();
   let lastCount = -1;
 
-  const emitIfGrown = () => {
-    let count = 0;
-    try {
-      count = typeof mod.get_segment_count === 'function' ? (mod.get_segment_count(instance) | 0) : 0;
-    } catch {
-      count = liveChunks.length;
-    }
-    hooks.onTick?.(Math.max(0, count));
-    if (count > lastCount) {
-      lastCount = count;
-      if (count > 0) {
-        hooks.onSegments?.();
-      }
-    }
-    return count;
-  };
-
   for (;;) {
-    emitIfGrown();
-    await paintFrame();
+    let count = liveChunks.length;
+    try {
+      if (typeof mod.get_segment_count === 'function') {
+        count = mod.get_segment_count(instance) | 0;
+      }
+    } catch {
+      /* keep liveChunks length */
+    }
+    if (count !== lastCount) {
+      lastCount = count;
+      hooks.onTick?.(count);
+    }
 
     let busy = true;
     try {
@@ -347,16 +276,14 @@ async function waitUntilIdle(mod, instance, timeoutMs, hooks = {}) {
     }
 
     if (!busy) {
-      await sleep(40);
-      emitIfGrown();
-      await paintFrame();
+      await sleep(8);
       return;
     }
 
     if (Date.now() - start > timeoutMs) {
       throw new Error('That took too long. Try a shorter clip or Quick.');
     }
-    await sleep(60);
+    await sleep(24);
   }
 }
 
@@ -370,19 +297,6 @@ function sleep(ms) {
 }
 
 /**
- * Yield so the browser can paint streamed transcript updates.
- */
-function paintFrame() {
-  return new Promise((resolve) => {
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => resolve());
-    } else {
-      setTimeout(resolve, 0);
-    }
-  });
-}
-
-/**
  * @param {any} mod
  * @param {number} instance
  * @param {boolean} withTimestamps
@@ -391,7 +305,8 @@ function paintFrame() {
 function readSegments(mod, instance, withTimestamps) {
   const n = mod.get_segment_count(instance) | 0;
   /** @type {Array<{ text: string, timestamp?: [number, number] }>} */
-  const chunks = [];
+  const chunks = new Array(n);
+  let used = 0;
   for (let i = 0; i < n; i++) {
     const text = String(mod.get_segment_text(instance, i) || '').trim();
     if (!text) {
@@ -399,9 +314,10 @@ function readSegments(mod, instance, withTimestamps) {
     }
     const t0 = (mod.get_segment_t0(instance, i) | 0) / 100;
     const t1 = (mod.get_segment_t1(instance, i) | 0) / 100;
-    chunks.push({ text, timestamp: [t0, t1] });
+    chunks[used++] = { text, timestamp: [t0, t1] };
   }
-  const text = chunks.map((c) => c.text).join(' ').replace(/\s+/g, ' ').trim();
+  chunks.length = used;
+  const text = joinChunkText(chunks);
   if (!withTimestamps) {
     return { text };
   }
@@ -419,7 +335,7 @@ function storeModel(mod, bytes) {
   } catch {
     /* missing is fine */
   }
-  mod.FS_createDataFile('/', MODEL_VFS_NAME, data, true, true);
+  mod.FS_createDataFile('/', MODEL_VFS_NAME, data, true, true, true);
 }
 
 /**
@@ -433,8 +349,6 @@ async function fetchModelBytes(path, onProgress) {
     throw new Error('Could not load the voice style.');
   }
 
-  // Do not size the buffer from Content-Length. CDNs often gzip the payload while
-  // fetch() yields the decompressed body, which is larger than Content-Length.
   const hinted = Number(res.headers.get('content-length') || 0);
   if (!res.body) {
     const buf = new Uint8Array(await res.arrayBuffer());
@@ -444,7 +358,7 @@ async function fetchModelBytes(path, onProgress) {
 
   const reader = res.body.getReader();
   /** @type {Uint8Array[]} */
-  const chunks = [];
+  const parts = [];
   let received = 0;
   for (;;) {
     const { done, value } = await reader.read();
@@ -454,28 +368,32 @@ async function fetchModelBytes(path, onProgress) {
     if (!value || value.length === 0) {
       continue;
     }
-    chunks.push(value);
+    parts.push(value);
     received += value.length;
     const denom = hinted > 0 ? Math.max(hinted, received) : 0;
     onProgress?.({
       status: 'fetching model',
-      progress: denom ? Math.min(0.95, received / denom) : Math.min(0.95, received / (received + 1)),
+      progress: denom ? Math.min(0.95, received / denom) : 0.5,
       file: path,
     });
   }
 
+  if (parts.length === 1) {
+    onProgress?.({ status: 'fetching model', progress: 1, file: path });
+    return ensurePlainBytes(parts[0]);
+  }
+
   const out = new Uint8Array(received);
   let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
+  for (let i = 0; i < parts.length; i++) {
+    out.set(parts[i], offset);
+    offset += parts[i].length;
   }
   onProgress?.({ status: 'fetching model', progress: 1, file: path });
-  return ensurePlainBytes(out);
+  return out;
 }
 
 /**
- * Guarantee a tightly packed Uint8Array for Emscripten MEMFS writes.
  * @param {Uint8Array} bytes
  * @returns {Uint8Array}
  */
@@ -487,12 +405,17 @@ function ensurePlainBytes(bytes) {
 }
 
 /**
+ * Use as many WASM pthread workers as the browser can spare (max 8).
  * @param {number} [n]
  */
 function clampThreads(n) {
-  const want = typeof n === 'number' && n > 0 ? n : 2;
+  const hw = typeof navigator !== 'undefined' && navigator.hardwareConcurrency
+    ? navigator.hardwareConcurrency
+    : 4;
+  const want = typeof n === 'number' && n > 0 ? n : hw;
+  const capped = Math.min(8, Math.max(1, want | 0));
   let p = 1;
-  while (p * 2 <= want && p * 2 <= 4) {
+  while (p * 2 <= capped) {
     p *= 2;
   }
   return p;
@@ -503,5 +426,5 @@ function clampThreads(n) {
  */
 function estimatedTimeoutMs(samples) {
   const sec = samples / TARGET_SAMPLE_RATE;
-  return Math.max(60000, Math.ceil(sec * 12000) + 20000);
+  return Math.max(45000, Math.ceil(sec * 8000) + 15000);
 }

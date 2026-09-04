@@ -62,6 +62,27 @@ export async function bootApp() {
   let playWatch = 0;
   /** @type {HTMLElement | null} */
   let activeSeg = null;
+  /** How many timestamp rows are already painted during live streaming. */
+  let paintedSegs = 0;
+
+  els.transcript.addEventListener('click', (ev) => {
+    const target = /** @type {HTMLElement} */ (ev.target);
+    const btn = target.closest('.seg-time');
+    if (!btn || !(btn instanceof HTMLButtonElement) || btn.disabled) {
+      return;
+    }
+    const row = btn.closest('.seg');
+    if (!(row instanceof HTMLElement)) {
+      return;
+    }
+    const start = Number(row.dataset.start);
+    if (!Number.isFinite(start)) {
+      return;
+    }
+    const endRaw = row.dataset.end;
+    const end = endRaw != null && endRaw !== '' ? Number(endRaw) : null;
+    void playFrom(start, Number.isFinite(end) ? end : null, row);
+  });
 
   setBusy(true, 'Getting ready...');
   try {
@@ -109,8 +130,9 @@ export async function bootApp() {
       });
   });
   els.timestamps.addEventListener('change', () => {
+    paintedSegs = 0;
     if (lastResult) {
-      renderTranscript(lastResult, els.timestamps.checked);
+      renderTranscript(lastResult, els.timestamps.checked, false);
     }
   });
 
@@ -292,11 +314,14 @@ export async function bootApp() {
     const t0 = performance.now();
     lastPCM = pcm;
     stopPlayback();
+    wave.setLiveData(null);
+    wave.setRecording(false);
     wave.setMode('transcribing');
     setStatus('Transcribing...');
     setLive(true);
     showProgress(8);
     els.transcript.classList.add('is-live');
+    paintedSegs = 0;
     els.transcript.replaceChildren();
 
     const result = await engine.transcribe(pcm, {
@@ -309,13 +334,14 @@ export async function bootApp() {
       },
       onPartial: (partial) => {
         lastResult = partial;
-        renderTranscript(partial, els.timestamps.checked);
+        renderTranscript(partial, els.timestamps.checked, true);
         updateActions(true);
       },
     });
 
     lastResult = result;
-    renderTranscript(result, els.timestamps.checked);
+    paintedSegs = 0;
+    renderTranscript(result, els.timestamps.checked, false);
     els.transcript.classList.remove('is-live');
     setLive(false);
     hideProgress();
@@ -440,11 +466,22 @@ export async function bootApp() {
   /**
    * @param {import('../engine/types.js').TranscriptResult} result
    * @param {boolean} withTimestamps
+   * @param {boolean} [appendOnly]
    */
-  function renderTranscript(result, withTimestamps) {
+  function renderTranscript(result, withTimestamps, appendOnly = false) {
     if (withTimestamps && result.chunks && result.chunks.length) {
-      els.transcript.replaceChildren();
-      for (const c of result.chunks) {
+      const chunks = result.chunks;
+      if (!appendOnly || paintedSegs === 0 || paintedSegs > chunks.length) {
+        els.transcript.replaceChildren();
+        paintedSegs = 0;
+      }
+      if (paintedSegs >= chunks.length) {
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      const canPlay = !!lastPCM;
+      for (let i = paintedSegs; i < chunks.length; i++) {
+        const c = chunks[i];
         const row = document.createElement('div');
         row.className = 'seg';
         const start = c.timestamp && c.timestamp[0] != null ? Number(c.timestamp[0]) : null;
@@ -463,23 +500,20 @@ export async function bootApp() {
           time.textContent = ts;
           time.title = start != null ? `Play from ${formatTime(start)}` : '';
           time.setAttribute('aria-label', start != null ? `Play from ${formatTime(start)}` : 'Timestamp');
-          if (start == null || !lastPCM) {
-            time.disabled = true;
-          } else {
-            time.addEventListener('click', () => {
-              void playFrom(start, end, row);
-            });
-          }
+          time.disabled = start == null || !canPlay;
           row.appendChild(time);
         }
         const text = document.createElement('span');
         text.className = 'seg-text';
-        text.textContent = c.text.trim();
+        text.textContent = (c.text || '').trim();
         row.appendChild(text);
-        els.transcript.appendChild(row);
+        frag.appendChild(row);
       }
+      els.transcript.appendChild(frag);
+      paintedSegs = chunks.length;
       return;
     }
+    paintedSegs = 0;
     els.transcript.textContent = (result.text || '').trim();
   }
 
@@ -515,10 +549,8 @@ export async function bootApp() {
       return;
     }
 
-    const copy = new Float32Array(slice.length);
-    copy.set(slice);
-    const buf = playCtx.createBuffer(1, copy.length, TARGET_SAMPLE_RATE);
-    buf.copyToChannel(copy, 0);
+    const buf = playCtx.createBuffer(1, slice.length, TARGET_SAMPLE_RATE);
+    buf.copyToChannel(slice, 0);
 
     const src = playCtx.createBufferSource();
     src.buffer = buf;
@@ -531,7 +563,7 @@ export async function bootApp() {
       segEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
-    const durationMs = (copy.length / TARGET_SAMPLE_RATE) * 1000;
+    const durationMs = (slice.length / TARGET_SAMPLE_RATE) * 1000;
     src.onended = () => {
       if (playSource === src) {
         clearActiveSeg();
@@ -607,6 +639,7 @@ export async function bootApp() {
     stopPlayback();
     lastResult = null;
     lastPCM = null;
+    paintedSegs = 0;
     els.transcript.replaceChildren();
     els.meta.hidden = true;
     els.meta.textContent = '';
