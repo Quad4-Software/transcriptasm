@@ -8,6 +8,7 @@ dist/
 .vscode/
 coverage.out
 coverage.html
+.lighthouseci/
 web/models/*.bin
 web/models/onnx/
 web/vendor/transformers/
