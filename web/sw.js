@@ -1,11 +1,12 @@
 /* transcriptasm service worker: offline shell + auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.1.1';
+const CACHE_VERSION = 'transcriptasm-v0.1.2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
 const PRECACHE = [
   '/',
   '/index.html',
+  '/favicon.ico',
   '/manifest.webmanifest',
   '/models.json',
   '/css/app.css',
@@ -21,8 +22,13 @@ const PRECACHE = [
   '/js/engine/types.js',
   '/js/engine/whisper-cpp.js',
   '/js/engine/whisper-parse.js',
+  '/icons/favicon-16.png',
+  '/icons/favicon-32.png',
+  '/icons/apple-touch-icon.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/icon-maskable-192.png',
+  '/icons/icon-maskable-512.png',
   '/fonts/bricolage-700.woff2',
   '/fonts/fraunces-400.woff2',
   '/fonts/fraunces-600.woff2',
