@@ -308,7 +308,7 @@ function readSegments(mod, instance, withTimestamps) {
   const chunks = new Array(n);
   let used = 0;
   for (let i = 0; i < n; i++) {
-    const text = String(mod.get_segment_text(instance, i) || '').trim();
+    const text = collapseRepeatLoops(String(mod.get_segment_text(instance, i) || '').trim());
     if (!text) {
       continue;
     }
@@ -322,6 +322,22 @@ function readSegments(mod, instance, withTimestamps) {
     return { text };
   }
   return { text, chunks };
+}
+
+/**
+ * Collapse runaway "word word word" loops from stuck greedy decode.
+ * @param {string} text
+ */
+function collapseRepeatLoops(text) {
+  if (!text) {
+    return text;
+  }
+  let out = text;
+  // Same token 4+ times in a row.
+  out = out.replace(/\b([\w']+)(?:\s+\1){3,}\b/gi, '$1');
+  // Short phrase repeated 3+ times.
+  out = out.replace(/\b((?:[\w']+\s+){0,3}[\w']+)(?:\s+\1){2,}\b/gi, '$1');
+  return out.replace(/\s{2,}/g, ' ').trim();
 }
 
 /**

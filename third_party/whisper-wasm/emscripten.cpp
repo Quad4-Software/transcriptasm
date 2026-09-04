@@ -100,15 +100,15 @@ EMSCRIPTEN_BINDINGS(whisper) {
 		params.no_timestamps = false;
 		params.token_timestamps = false;
 		params.suppress_blank = true;
-		params.suppress_nst = true;
+		params.suppress_nst = false;
 		params.temperature = 0.0f;
-		params.temperature_inc = 0.0f;
-		params.entropy_thold = 2.8f;
-		params.logprob_thold = -0.8f;
-		params.no_speech_thold = 0.5f;
+		// Keep fallback so stuck greedy loops (foam foam foam) can recover.
+		params.temperature_inc = 0.2f;
+		params.entropy_thold = 2.4f;
+		params.logprob_thold = -1.0f;
+		params.no_speech_thold = 0.6f;
 		params.max_len = 0;
-		// Smaller encoder context trades a little accuracy for a lot of speed in WASM.
-		params.audio_ctx = 768;
+		params.audio_ctx = 0;
 
 		std::vector<float> pcmf32;
 		const int n = audio["length"].as<int>();
