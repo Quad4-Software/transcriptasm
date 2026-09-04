@@ -1,7 +1,7 @@
 {
   "name": "transcriptasm",
   "short_name": "transcriptasm",
-  "description": "Speech to text in your browser. Nothing is uploaded.",
+  "description": "Offline speech-to-text in the browser via Whisper WASM. Nothing is uploaded.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
