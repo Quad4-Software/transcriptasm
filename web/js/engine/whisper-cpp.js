@@ -285,12 +285,13 @@ function readSegments(mod, instance, withTimestamps) {
  * @param {Uint8Array} bytes
  */
 function storeModel(mod, bytes) {
+  const data = ensurePlainBytes(bytes);
   try {
     mod.FS_unlink(MODEL_VFS_NAME);
   } catch {
     /* missing is fine */
   }
-  mod.FS_createDataFile('/', MODEL_VFS_NAME, bytes, true, true);
+  mod.FS_createDataFile('/', MODEL_VFS_NAME, data, true, true);
 }
 
 /**
@@ -299,34 +300,62 @@ function storeModel(mod, bytes) {
  * @returns {Promise<Uint8Array>}
  */
 async function fetchModelBytes(path, onProgress) {
-  const res = await fetch(path, { cache: 'force-cache' });
+  const res = await fetch(path);
   if (!res.ok) {
     throw new Error('Could not load the voice style.');
   }
-  const total = Number(res.headers.get('content-length') || 0);
-  if (!res.body || !total) {
+
+  // Do not size the buffer from Content-Length. CDNs often gzip the payload while
+  // fetch() yields the decompressed body, which is larger than Content-Length.
+  const hinted = Number(res.headers.get('content-length') || 0);
+  if (!res.body) {
     const buf = new Uint8Array(await res.arrayBuffer());
     onProgress?.({ status: 'fetching model', progress: 1, file: path });
-    return buf;
+    return ensurePlainBytes(buf);
   }
 
   const reader = res.body.getReader();
-  const out = new Uint8Array(total);
-  let offset = 0;
+  /** @type {Uint8Array[]} */
+  const chunks = [];
+  let received = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) {
       break;
     }
-    out.set(value, offset);
-    offset += value.length;
+    if (!value || value.length === 0) {
+      continue;
+    }
+    chunks.push(value);
+    received += value.length;
+    const denom = hinted > 0 ? Math.max(hinted, received) : 0;
     onProgress?.({
       status: 'fetching model',
-      progress: Math.min(0.9, offset / total),
+      progress: denom ? Math.min(0.95, received / denom) : Math.min(0.95, received / (received + 1)),
       file: path,
     });
   }
-  return out.subarray(0, offset);
+
+  const out = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  onProgress?.({ status: 'fetching model', progress: 1, file: path });
+  return ensurePlainBytes(out);
+}
+
+/**
+ * Guarantee a tightly packed Uint8Array for Emscripten MEMFS writes.
+ * @param {Uint8Array} bytes
+ * @returns {Uint8Array}
+ */
+function ensurePlainBytes(bytes) {
+  if (bytes.byteOffset === 0 && bytes.buffer.byteLength === bytes.byteLength) {
+    return bytes;
+  }
+  return bytes.slice();
 }
 
 /**
