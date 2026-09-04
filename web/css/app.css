@@ -242,7 +242,7 @@ body {
 .brand-block {
   max-width: 40rem;
   margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
-  animation: rise 0.9s var(--ease) both;
+  animation: rise 0.9s var(--ease) backwards;
 }
 
 .brand {
@@ -281,12 +281,20 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  animation: rise 1.05s var(--ease) both;
+  min-width: 0;
+  animation: rise 1.05s var(--ease) backwards;
 }
 
 .panel-input {
   gap: 1rem;
+  animation-name: fade-rise;
   animation-delay: 0.06s;
+}
+
+.capture-status {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .panel-result {
@@ -298,6 +306,8 @@ body {
 
 .hero-visual {
   margin: 0;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 #wave {
@@ -310,6 +320,12 @@ body {
 .controls {
   display: grid;
   gap: 1rem;
+  min-width: 0;
+}
+
+.action-dock {
+  display: block;
+  min-width: 0;
 }
 
 .control-row {
@@ -406,6 +422,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .cta {
@@ -793,6 +810,15 @@ body {
   }
 }
 
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 900px) {
   .brand-block {
     padding-right: 5.5rem;
@@ -810,6 +836,10 @@ body {
   .lede {
     font-size: 1rem;
     line-height: 1.5;
+  }
+
+  .stage {
+    width: min(100% - 1.5rem, 1180px);
   }
 
   .workspace {
@@ -850,14 +880,19 @@ body {
 
 @media (max-width: 640px) {
   :root {
-    --dock-h: 4.75rem;
+    --dock-pad-y: 0.7rem;
+    --dock-pad-x: 0.85rem;
+    --dock-btn-h: 3.25rem;
+    --dock-h: calc(var(--dock-pad-y) * 2 + var(--dock-btn-h) + var(--safe-bottom));
     --chrome-h: 3.1rem;
+    --stage-x: 1rem;
   }
 
   .stage {
-    width: min(100% - 1.25rem, 1180px);
-    padding-top: calc(var(--chrome-h) + 0.85rem + var(--safe-top));
-    padding-bottom: 1rem;
+    width: min(calc(100% - (var(--stage-x) * 2)), 1180px);
+    max-width: 100%;
+    padding-top: calc(var(--chrome-h) + 0.75rem + var(--safe-top));
+    padding-bottom: calc(var(--dock-h) + 0.85rem);
   }
 
   .chrome-top {
@@ -882,40 +917,71 @@ body {
 
   .brand-block {
     padding-right: 0;
-    margin-bottom: 1.1rem;
+    margin-bottom: 1rem;
+    max-width: none;
   }
 
   .brand {
-    font-size: clamp(2.15rem, 11vw, 2.75rem);
+    font-size: clamp(2rem, 10.5vw, 2.6rem);
+  }
+
+  .headline {
+    font-size: clamp(1.05rem, 4.2vw, 1.3rem);
+  }
+
+  .lede {
+    font-size: 0.98rem;
+    max-width: none;
+  }
+
+  .workspace {
+    gap: 1rem;
+  }
+
+  .panel-input {
+    gap: 0.9rem;
   }
 
   .toggles-row {
     gap: 0.35rem 1rem;
   }
 
-  .cta-row {
+  .action-dock {
     position: fixed;
-    left: max(0.65rem, var(--safe-left));
-    right: max(0.65rem, var(--safe-right));
-    bottom: max(0.65rem, var(--safe-bottom));
+    left: 0;
+    right: 0;
+    bottom: 0;
     top: auto;
     z-index: 12;
+    margin: 0;
+    padding: var(--dock-pad-y) max(var(--dock-pad-x), var(--safe-left)) calc(var(--dock-pad-y) + var(--safe-bottom)) max(var(--dock-pad-x), var(--safe-right));
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: color-mix(in srgb, var(--panel) 96%, black);
+    box-shadow: 0 -12px 32px color-mix(in srgb, black 42%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .action-dock .cta-row {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
     gap: 0.55rem;
-    padding: 0.55rem;
-    border: 1px solid var(--line);
-    border-radius: calc(var(--radius) + 2px);
-    background: color-mix(in srgb, var(--panel) 94%, black);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, black 35%, transparent),
-      0 14px 36px color-mix(in srgb, black 45%, transparent);
-    backdrop-filter: blur(14px);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .cta {
     flex: 1 1 0;
     min-width: 0;
     justify-content: center;
-    min-height: 3.25rem;
+    min-height: var(--dock-btn-h);
     padding: 0.85rem 0.75rem;
     font-size: 1rem;
   }
@@ -927,15 +993,27 @@ body {
   .site-foot {
     position: static;
     justify-content: flex-start;
-    margin: 1.25rem auto calc(0.35rem + var(--dock-h) + var(--safe-bottom));
-    width: min(100% - 1.25rem, 1180px);
-    padding: 0 0 0.25rem;
+    margin: 0.85rem auto 0;
+    width: min(calc(100% - (var(--stage-x) * 2)), 1180px);
+    padding: 0 0 0.15rem;
     right: auto;
     bottom: auto;
   }
 
   .panel-result {
     border-radius: var(--radius);
+    padding: 0.95rem;
+  }
+
+  .transcript {
+    max-height: none;
+    min-height: 7.5rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .result-toolbar {
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
   }
 
   .result-toolbar h2 {
@@ -948,7 +1026,8 @@ body {
 
   .result-actions .action-btn,
   .result-actions .export-wrap {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .result-actions .export-wrap .action-btn {
@@ -980,32 +1059,44 @@ body {
   .status-row {
     min-height: 2rem;
   }
+
+  .meta {
+    margin-top: 0.7rem;
+  }
+
+  #wave {
+    max-height: 112px;
+  }
 }
 
 @media (max-width: 640px) and (orientation: landscape) {
   :root {
-    --dock-h: 3.85rem;
+    --dock-pad-y: 0.45rem;
+    --dock-btn-h: 2.85rem;
   }
 
   .cta {
-    min-height: 2.85rem;
-    padding: 0.65rem 0.75rem;
+    min-height: var(--dock-btn-h);
+    padding: 0.55rem 0.75rem;
   }
 
   #wave {
-    max-height: 88px;
+    max-height: 72px;
   }
 
   .transcript {
-    max-height: min(56dvh, 22rem);
-    min-height: 9rem;
+    min-height: 8rem;
   }
 
   .brand-block {
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.65rem;
   }
 
   .headline {
+    display: none;
+  }
+
+  .lede {
     display: none;
   }
 }
@@ -1054,7 +1145,7 @@ body {
   .pwa-toast {
     left: max(0.75rem, var(--safe-left));
     right: max(0.75rem, var(--safe-right));
-    bottom: calc(var(--dock-h) + 0.85rem + var(--safe-bottom));
+    bottom: calc(var(--dock-h) + 0.65rem);
     width: auto;
     transform: translateY(120%);
     text-align: center;
@@ -1064,3 +1155,4 @@ body {
     transform: translateY(0);
   }
 }
+
