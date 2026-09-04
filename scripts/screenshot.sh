@@ -7,7 +7,7 @@ DIR="$ROOT/scripts/screenshot"
 
 cd "$DIR"
 if [[ ! -d node_modules/playwright ]]; then
-	npm install --no-fund --no-audit
+	npm ci --no-fund --no-audit
 fi
 
 # Prefer system Chromium. Only download Playwright's browser when none found.
