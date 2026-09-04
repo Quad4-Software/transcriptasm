@@ -1,0 +1,40 @@
+# Pinned actions (bump tag and SHA together when upgrading):
+#   actions/checkout@v7.0.0                 9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+#   treosh/lighthouse-ci-action@12.6.2      3e7e23fb74242897f95c0ba9cabad3d0227b9b18
+#
+# Secure use: least-privilege GITHUB_TOKEN, pin actions to full commit SHAs,
+# pull_request (not pull_request_target), no untrusted checkout with secrets.
+# https://docs.github.com/en/actions/reference/security/secure-use
+
+name: Lighthouse
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: lighthouse-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Audit web/ and assert gates
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # 12.6.2
+        with:
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
