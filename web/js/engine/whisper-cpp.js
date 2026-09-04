@@ -39,7 +39,7 @@ function loadModule() {
       return;
     }
     if (!globalThis.crossOriginIsolated) {
-      reject(new Error('This tab needs a refresh to enable local voice processing.'));
+      reject(new Error('This tab is not cross-origin isolated yet. Refresh once to enable local voice processing.'));
       return;
     }
     const existing = /** @type {any} */ (window).Module;

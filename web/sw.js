@@ -1,5 +1,5 @@
-/* transcriptasm service worker: offline shell + auto-update */
-const CACHE_VERSION = 'transcriptasm-v0.1.3';
+/* transcriptasm service worker: offline shell, COOP/COEP isolation, auto-update */
+const CACHE_VERSION = 'transcriptasm-v0.1.4';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
@@ -74,6 +74,9 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') {
     return;
   }
+  if (req.cache === 'only-if-cached' && req.mode !== 'same-origin') {
+    return;
+  }
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) {
@@ -109,6 +112,26 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(staleWhileRevalidate(req, SHELL_CACHE));
 });
 
+/**
+ * GitHub Pages cannot set COOP/COEP. Inject them so SharedArrayBuffer works.
+ * @param {Response} response
+ * @returns {Response}
+ */
+function withIsolationHeaders(response) {
+  if (!response || response.status === 0 || response.type === 'opaque') {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function networkOnly(req) {
   return fetch(req);
 }
@@ -120,20 +143,20 @@ async function networkFirst(req, cacheName, fallbackPath) {
       const cache = await caches.open(cacheName);
       cache.put(req, fresh.clone());
     }
-    return fresh;
+    return withIsolationHeaders(fresh);
   } catch {
     const cache = await caches.open(cacheName);
     const cached = await cache.match(req);
     if (cached) {
-      return cached;
+      return withIsolationHeaders(cached);
     }
     if (fallbackPath) {
       const fallback = await cache.match(fallbackPath);
       if (fallback) {
-        return fallback;
+        return withIsolationHeaders(fallback);
       }
     }
-    return new Response('Offline', { status: 503, statusText: 'Offline' });
+    return withIsolationHeaders(new Response('Offline', { status: 503, statusText: 'Offline' }));
   }
 }
 
@@ -141,13 +164,13 @@ async function cacheFirst(req, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(req);
   if (cached) {
-    return cached;
+    return withIsolationHeaders(cached);
   }
   const fresh = await fetch(req);
   if (fresh && fresh.ok) {
     cache.put(req, fresh.clone());
   }
-  return fresh;
+  return withIsolationHeaders(fresh);
 }
 
 async function staleWhileRevalidate(req, cacheName) {
@@ -161,5 +184,6 @@ async function staleWhileRevalidate(req, cacheName) {
       return fresh;
     })
     .catch(() => cached);
-  return cached || network;
+  const response = cached || (await network);
+  return withIsolationHeaders(response);
 }
