@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "transcriptasm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Offline speech-to-text via on-device Whisper. Record from the extension bridge tab.",
   "icons": {
     "16": "icons/icon-16.png",
