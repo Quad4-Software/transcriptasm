@@ -1,0 +1,11 @@
+{
+  "name": "transcriptasm",
+  "repo": "Quad4-Software/transcriptasm",
+  "live": "https://transcriptasm.quad4.io",
+  "image": "ghcr.io/quad4-software/transcriptasm",
+  "license": "0BSD",
+  "tagline": "in-browser Whisper",
+  "labelColor": "0a0a0b",
+  "color": "8ad0c6",
+  "style": "flat-square"
+}
